@@ -1,0 +1,71 @@
+const env = require('./config/env');
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+
+// Run migrations on startup
+require('./db/migrate');
+
+const app = express();
+
+// CORS
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
+
+// Security
+app.use(helmet());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use(limiter);
+
+// Body parsing
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(env.COOKIE_SECRET));
+
+// Static files (for uploaded PDFs)
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Routes
+const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard');
+const documentRoutes = require('./routes/documents');
+const shareRoutes = require('./routes/share');
+const analyticsRoutes = require('./routes/analytics');
+const workspaceRoutes = require('./routes/workspaces');
+const billingRoutes = require('./routes/billing');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/share', shareRoutes);
+app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/billing', billingRoutes);
+
+// Analytics nested under documents
+app.use('/api/documents', analyticsRoutes);
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+app.listen(env.PORT, () => {
+  console.log(`DocuSend API running at http://localhost:${env.PORT}`);
+});
