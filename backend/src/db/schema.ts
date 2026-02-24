@@ -134,6 +134,51 @@ const dealActivities = sqliteTable('deal_activities', {
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
 
+const sessions = sqliteTable('sessions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  documentId: integer('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  code: text('code').notNull().unique(),
+  status: text('status').notNull().default('waiting'), // waiting/active/ended
+  maxParticipants: integer('max_participants').notNull().default(5),
+  startedAt: text('started_at'),
+  endedAt: text('ended_at'),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+const sessionParticipants = sqliteTable('session_participants', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sessionId: integer('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: text('role').notNull().default('member'), // host/member
+  color: text('color').notNull(),
+  joinedAt: text('joined_at').notNull().$defaultFn(() => new Date().toISOString()),
+  leftAt: text('left_at'),
+});
+
+const sessionMessages = sqliteTable('session_messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sessionId: integer('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  annotationId: integer('annotation_id'),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+const annotations = sqliteTable('annotations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sessionId: integer('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  pageNumber: integer('page_number').notNull(),
+  type: text('type').notNull(), // highlight/comment/freehand/shape/text
+  data: text('data').notNull(), // JSON
+  color: text('color').notNull(),
+  resolved: integer('resolved', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 module.exports = {
   users,
   documents,
@@ -147,4 +192,8 @@ module.exports = {
   deals,
   stakeholders,
   dealActivities,
+  sessions,
+  sessionParticipants,
+  sessionMessages,
+  annotations,
 };

@@ -8,7 +8,8 @@
     "dev": "nodemon --watch src --ext ts --exec tsx src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "set-plan": "tsx src/scripts/set-plan.ts"
   },
   "keywords": [
     "document-sharing",

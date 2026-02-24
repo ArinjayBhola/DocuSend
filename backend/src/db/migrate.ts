@@ -161,6 +161,59 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stakeholders_deal_id ON stakeholders(deal_id);
   CREATE INDEX IF NOT EXISTS idx_stakeholders_email ON stakeholders(email);
   CREATE INDEX IF NOT EXISTS idx_deal_activities_deal_id ON deal_activities(deal_id);
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'waiting',
+    max_participants INTEGER NOT NULL DEFAULT 5,
+    started_at TEXT,
+    ended_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS session_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member',
+    color TEXT NOT NULL,
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    left_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS session_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    annotation_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page_number INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    color TEXT NOT NULL,
+    resolved INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code);
+  CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+  CREATE INDEX IF NOT EXISTS idx_session_participants_session_id ON session_participants(session_id);
+  CREATE INDEX IF NOT EXISTS idx_session_participants_user_id ON session_participants(user_id);
+  CREATE INDEX IF NOT EXISTS idx_session_messages_session_id ON session_messages(session_id);
+  CREATE INDEX IF NOT EXISTS idx_annotations_session_id ON annotations(session_id);
 `);
 
 console.log('Database migrated successfully!');

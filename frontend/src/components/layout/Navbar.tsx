@@ -38,6 +38,7 @@ export default function Navbar() {
                 <Link to="/workspaces" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Workspaces</Link>
                 <Link to="/leads" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Leads</Link>
                 <Link to="/deals" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Deals</Link>
+                <Link to="/sessions" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Sessions</Link>
                 <Link to="/billing" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Billing</Link>
 
                 <div className="h-6 w-px bg-neutral-200 mx-2"></div>

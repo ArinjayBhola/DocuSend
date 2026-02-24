@@ -62,6 +62,9 @@ app.use('/api/live', liveRoutes);
 const dealsRoutes = require('./routes/deals');
 app.use('/api/deals', dealsRoutes);
 
+const sessionsRoutes = require('./routes/sessions');
+app.use('/api/sessions', sessionsRoutes);
+
 // Analytics nested under documents
 app.use('/api/documents', analyticsRoutes);
 

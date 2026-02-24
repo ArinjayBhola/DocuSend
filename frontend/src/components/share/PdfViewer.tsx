@@ -1,110 +1,59 @@
-import { useEffect, useRef, useState } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { useEffect, useRef } from 'react'
+import usePdfRenderer from '../../hooks/usePdfRenderer'
 import { startView, trackPage, endView } from '../../api/share'
 import { startLiveSession, livePageChange, endLiveSession } from '../../api/live'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
-
 export default function PdfViewer({ document, viewerEmail }) {
-  const containerRef = useRef(null)
+  const pdfUrl = `/api/share/pdf/${document.shareSlug}`
+  const { loading, error, numPages, currentPage, currentPageRef, containerRef } = usePdfRenderer(pdfUrl)
   const viewIdRef = useRef(null)
-  const currentPageRef = useRef(1)
   const pageStartRef = useRef(Date.now())
-  const [numPages, setNumPages] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const prevPageRef = useRef(1)
 
+  // Start view session once PDF loads
   useEffect(() => {
+    if (loading || error || !numPages) return
+
     let cancelled = false
 
-    async function loadPdf() {
+    async function initTracking() {
       try {
-        const pdfUrl = `/api/share/pdf/${document.shareSlug}`
-        const pdf = await pdfjsLib.getDocument(pdfUrl).promise
+        const { viewId } = await startView({
+          documentId: document.id,
+          viewerEmail: viewerEmail || null,
+          totalPages: numPages,
+        })
         if (cancelled) return
-
-        setNumPages(pdf.numPages)
-        setLoading(false)
-
-      // Start view session
-      const { viewId } = await startView({
-        documentId: document.id,
-        viewerEmail: viewerEmail || null,
-        totalPages: pdf.numPages,
-      })
-      viewIdRef.current = viewId
-
-      // Register live session (fire and forget)
-      startLiveSession({ viewId, documentId: document.id, viewerEmail: viewerEmail || null, totalPages: pdf.numPages }).catch(() => {})
-
-      // Render all pages
-      const container = containerRef.current
-      container.innerHTML = ''
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i)
-        const viewport = page.getViewport({ scale: 1.5 })
-
-        const wrapper = window.document.createElement('div')
-        wrapper.className = 'pdf-page bg-white p-1 rounded-sm shadow-2xl'
-        wrapper.dataset.page = i.toString()
-        wrapper.style.width = `${viewport.width}px`
-
-        const canvas = window.document.createElement('canvas')
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        wrapper.appendChild(canvas)
-        container.appendChild(wrapper)
-
-        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
-        await page.render({ canvasContext: ctx, canvas: canvas, viewport }).promise
-      }
-
-      // Observe page visibility
-      const observer = new IntersectionObserver((entries) => {
-        const visible = entries.filter(e => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)
-        if (visible.length > 0) {
-          const pageNum = parseInt((visible[0].target as HTMLElement).dataset.page!)
-          if (pageNum !== currentPageRef.current) {
-            // Track time on previous page
-            const timeSpent = Date.now() - pageStartRef.current
-            if (viewIdRef.current && timeSpent > 500) {
-              trackPage({ viewId: viewIdRef.current, pageNumber: currentPageRef.current, timeSpent })
-              livePageChange({ viewId: viewIdRef.current, pageNumber: pageNum, timeSpent }).catch(() => {})
-            }
-            currentPageRef.current = pageNum
-            pageStartRef.current = Date.now()
-            setCurrentPage(pageNum)
-          }
-        }
-      }, { threshold: 0.5 })
-
-      container.querySelectorAll('.pdf-page').forEach(el => observer.observe(el))
-
-      return () => observer.disconnect()
+        viewIdRef.current = viewId
+        startLiveSession({ viewId, documentId: document.id, viewerEmail: viewerEmail || null, totalPages: numPages }).catch(() => {})
       } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to load PDF:', err)
-          setError(err.message || 'Failed to load document')
-          setLoading(false)
-        }
+        console.error('Failed to start view tracking:', err)
       }
     }
 
-    loadPdf()
+    initTracking()
 
     return () => {
       cancelled = true
-      // Send final page event
       if (viewIdRef.current) {
         const timeSpent = Date.now() - pageStartRef.current
         endView({ viewId: viewIdRef.current, pageNumber: currentPageRef.current, timeSpent })
         endLiveSession({ viewId: viewIdRef.current })
       }
     }
-  }, [document, viewerEmail])
+  }, [loading, error, numPages, document, viewerEmail])
+
+  // Track page changes
+  useEffect(() => {
+    if (currentPage === prevPageRef.current) return
+    const timeSpent = Date.now() - pageStartRef.current
+    if (viewIdRef.current && timeSpent > 500) {
+      trackPage({ viewId: viewIdRef.current, pageNumber: prevPageRef.current, timeSpent })
+      livePageChange({ viewId: viewIdRef.current, pageNumber: currentPage, timeSpent }).catch(() => {})
+    }
+    prevPageRef.current = currentPage
+    pageStartRef.current = Date.now()
+  }, [currentPage])
 
   return (
     <div className="min-h-screen bg-neutral-900 selection:bg-brand-500/30">
