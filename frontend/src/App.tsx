@@ -13,6 +13,8 @@ import Workspaces from './pages/Workspaces'
 import WorkspaceNew from './pages/WorkspaceNew'
 import WorkspaceDetail from './pages/WorkspaceDetail'
 import Billing from './pages/Billing'
+import Leads from './pages/Leads'
+import NotificationSettings from './pages/NotificationSettings'
 import ShareViewer from './pages/ShareViewer'
 import ShareWorkspace from './pages/ShareWorkspace'
 import NotFound from './pages/NotFound'
@@ -42,6 +44,8 @@ export default function App() {
               <Route path="/workspaces/new" element={<WorkspaceNew />} />
               <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
               <Route path="/billing" element={<Billing />} />
+              <Route path="/leads" element={<Leads />} />
+              <Route path="/notifications/settings" element={<NotificationSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

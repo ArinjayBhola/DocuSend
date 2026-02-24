@@ -66,6 +66,28 @@ const workspaceDocuments = sqliteTable('workspace_documents', {
   order: integer('order').notNull().default(0),
 });
 
+const notifications = sqliteTable('notifications', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  documentId: integer('document_id').references(() => documents.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // view, email_captured
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  viewerEmail: text('viewer_email'),
+  viewerIp: text('viewer_ip'),
+  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+const notificationPreferences = sqliteTable('notification_preferences', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  emailOnView: integer('email_on_view', { mode: 'boolean' }).notNull().default(true),
+  emailOnEmailCapture: integer('email_on_email_capture', { mode: 'boolean' }).notNull().default(true),
+  inAppNotifications: integer('in_app_notifications', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 const subscriptions = sqliteTable('subscriptions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -85,5 +107,7 @@ module.exports = {
   pageEvents,
   workspaces,
   workspaceDocuments,
+  notifications,
+  notificationPreferences,
   subscriptions,
 };

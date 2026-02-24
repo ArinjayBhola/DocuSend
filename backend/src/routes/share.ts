@@ -2,9 +2,89 @@ const express = require('express');
 const path = require('path');
 const { eq, sql } = require('drizzle-orm');
 const { db } = require('../config/db');
-const { documents, documentViews, pageEvents } = require('../db/schema');
+const { documents, documentViews, pageEvents, notifications, notificationPreferences, users } = require('../db/schema');
+
+const { sendViewNotification } = require('../services/email');
 
 const router = express.Router();
+
+// Helper: create notification + send email for a document view
+function notifyDocumentView({ documentId, viewerEmail, viewerIp }) {
+  try {
+    const doc = db.select({
+      id: documents.id,
+      title: documents.title,
+      userId: documents.userId,
+    }).from(documents).where(eq(documents.id, documentId)).get();
+
+    if (!doc) return;
+
+    const owner = db.select().from(users).where(eq(users.id, doc.userId)).get();
+    if (!owner) return;
+
+    // Check notification preferences
+    const prefs = db.select().from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, doc.userId)).get();
+
+    const shouldNotifyInApp = !prefs || prefs.inAppNotifications;
+    const shouldNotifyEmail = !prefs || prefs.emailOnView;
+
+    if (shouldNotifyInApp) {
+      const viewer = viewerEmail || viewerIp || 'Someone';
+      db.insert(notifications).values({
+        userId: doc.userId,
+        documentId: doc.id,
+        type: 'view',
+        title: `New view on "${doc.title}"`,
+        message: `${viewer} started viewing your document.`,
+        viewerEmail: viewerEmail || null,
+        viewerIp: viewerIp || null,
+      }).run();
+    }
+
+    if (shouldNotifyEmail) {
+      sendViewNotification({
+        ownerEmail: owner.email,
+        documentTitle: doc.title,
+        viewerEmail,
+        viewerIp,
+      }).catch(() => {}); // fire and forget
+    }
+  } catch (err) {
+    console.error('[Notification Error]', err);
+  }
+}
+
+// Helper: notify on email capture
+function notifyEmailCapture({ documentId, email }) {
+  try {
+    const doc = db.select({
+      id: documents.id,
+      title: documents.title,
+      userId: documents.userId,
+    }).from(documents).where(eq(documents.id, documentId)).get();
+
+    if (!doc) return;
+
+    const prefs = db.select().from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, doc.userId)).get();
+
+    const shouldNotify = !prefs || prefs.emailOnEmailCapture;
+
+    if (shouldNotify) {
+      db.insert(notifications).values({
+        userId: doc.userId,
+        documentId: doc.id,
+        type: 'email_captured',
+        title: `New lead captured!`,
+        message: `${email} shared their email to view "${doc.title}".`,
+        viewerEmail: email,
+      }).run();
+    }
+  } catch (err) {
+    console.error('[Notification Error]', err);
+  }
+}
 
 // Get share document metadata
 router.get('/:slug', (req, res) => {
@@ -59,6 +139,11 @@ router.post('/:slug/submit-email', (req, res) => {
   const doc = db.select().from(documents).where(eq(documents.shareSlug, req.params.slug)).get();
   if (!doc) return res.status(404).json({ error: 'Not found' });
 
+  // Notify about lead capture
+  if (email) {
+    notifyEmailCapture({ documentId: doc.id, email });
+  }
+
   res.json({ ok: true });
 });
 
@@ -66,14 +151,19 @@ router.post('/:slug/submit-email', (req, res) => {
 router.post('/views/start', (req, res) => {
   const { documentId, viewerEmail, totalPages } = req.body;
 
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+
   const result = db.insert(documentViews).values({
     documentId,
     viewerEmail: viewerEmail || null,
-    viewerIp: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+    viewerIp: ip,
     userAgent: req.headers['user-agent'] || '',
     totalPages: totalPages || 0,
     referrer: req.headers['referer'] || '',
   }).run();
+
+  // Fire notification
+  notifyDocumentView({ documentId, viewerEmail, viewerIp: ip });
 
   res.json({ viewId: Number(result.lastInsertRowid) });
 });

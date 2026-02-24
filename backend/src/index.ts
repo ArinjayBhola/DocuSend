@@ -44,6 +44,8 @@ const shareRoutes = require('./routes/share');
 const analyticsRoutes = require('./routes/analytics');
 const workspaceRoutes = require('./routes/workspaces');
 const billingRoutes = require('./routes/billing');
+const notificationRoutes = require('./routes/notifications');
+const leadsRoutes = require('./routes/leads');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -51,6 +53,8 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/leads', leadsRoutes);
 
 // Analytics nested under documents
 app.use('/api/documents', analyticsRoutes);

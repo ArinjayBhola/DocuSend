@@ -45,6 +45,7 @@ The backend API will start on `http://localhost:3000`.
 ### 2. Frontend Setup
 
 In a new terminal:
+
 ```bash
 cd frontend
 npm install
@@ -68,7 +69,7 @@ The frontend application will be available at `http://localhost:5173`.
 │   │   ├── services/         # Integrations (Razorpay, Email)
 │   │   └── utils/            # Helpers
 │   ├── tsconfig.json         # TypeScript configuration
-│   └── package.json          
+│   └── package.json
 │
 ├── frontend/                 # React SPA
 │   ├── src/                  # TypeScript React code
@@ -79,7 +80,7 @@ The frontend application will be available at `http://localhost:5173`.
 │   │   ├── pages/            # Route Components
 │   │   └── utils/            # Helpers
 │   ├── tsconfig.json         # TypeScript configuration
-│   └── package.json          
+│   └── package.json
 │
 └── README.md                 # This file
 ```
@@ -87,9 +88,8 @@ The frontend application will be available at `http://localhost:5173`.
 ## � Documentation
 
 For more detailed information about each component, see the respective documentation:
+
 - [Frontend Documentation](./frontend/README.md)
 - [Backend Documentation](./backend/README.md)
 
 ---
-
-Built by Claude Code. Trackable. Profitable. Simple.

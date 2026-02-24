@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import NotificationBell from '../notifications/NotificationBell'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -28,9 +29,12 @@ export default function Navbar() {
               <>
                 <Link to="/dashboard" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Dashboard</Link>
                 <Link to="/workspaces" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Workspaces</Link>
+                <Link to="/leads" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Leads</Link>
                 <Link to="/billing" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Billing</Link>
-                
+
                 <div className="h-6 w-px bg-neutral-200 mx-2"></div>
+
+                <NotificationBell />
                 
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center shadow-sm">

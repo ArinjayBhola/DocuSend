@@ -95,6 +95,32 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
   CREATE INDEX IF NOT EXISTS idx_workspace_documents_workspace_id ON workspace_documents(workspace_id);
   CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    viewer_email TEXT,
+    viewer_ip TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS notification_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email_on_view INTEGER NOT NULL DEFAULT 1,
+    email_on_email_capture INTEGER NOT NULL DEFAULT 1,
+    in_app_notifications INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
+  CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id ON notification_preferences(user_id);
 `);
 
 console.log('Database migrated successfully!');
