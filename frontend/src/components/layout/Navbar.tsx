@@ -28,8 +28,16 @@ export default function Navbar() {
             {user ? (
               <>
                 <Link to="/dashboard" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Dashboard</Link>
+                <Link to="/live" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors inline-flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Live
+                </Link>
                 <Link to="/workspaces" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Workspaces</Link>
                 <Link to="/leads" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Leads</Link>
+                <Link to="/deals" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Deals</Link>
                 <Link to="/billing" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Billing</Link>
 
                 <div className="h-6 w-px bg-neutral-200 mx-2"></div>

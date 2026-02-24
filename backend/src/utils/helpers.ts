@@ -51,9 +51,9 @@ function timeAgo(dateStr) {
 }
 
 const PLAN_LIMITS = {
-  free: { documents: 5, viewsPerMonth: 100, workspaces: 0, teamSeats: 1 },
-  pro: { documents: 50, viewsPerMonth: Infinity, workspaces: 5, teamSeats: 1 },
-  business: { documents: Infinity, viewsPerMonth: Infinity, workspaces: Infinity, teamSeats: 10 },
+  free: { documents: 5, viewsPerMonth: 100, workspaces: 0, teamSeats: 1, deals: 0 },
+  pro: { documents: 50, viewsPerMonth: Infinity, workspaces: 5, teamSeats: 1, deals: 5 },
+  business: { documents: Infinity, viewsPerMonth: Infinity, workspaces: Infinity, teamSeats: 10, deals: Infinity },
 };
 
 function getPlanLimits(plan) {

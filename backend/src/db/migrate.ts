@@ -121,6 +121,46 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
   CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id ON notification_preferences(user_id);
+
+  CREATE TABLE IF NOT EXISTS deals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    account_name TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'prospecting',
+    value REAL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    close_date TEXT,
+    stage_entered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    health_status TEXT NOT NULL DEFAULT 'healthy',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS stakeholders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'influencer',
+    added_manually INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS deal_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id INTEGER NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    metadata TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_deals_user_id ON deals(user_id);
+  CREATE INDEX IF NOT EXISTS idx_deals_workspace_id ON deals(workspace_id);
+  CREATE INDEX IF NOT EXISTS idx_stakeholders_deal_id ON stakeholders(deal_id);
+  CREATE INDEX IF NOT EXISTS idx_stakeholders_email ON stakeholders(email);
+  CREATE INDEX IF NOT EXISTS idx_deal_activities_deal_id ON deal_activities(deal_id);
 `);
 
 console.log('Database migrated successfully!');

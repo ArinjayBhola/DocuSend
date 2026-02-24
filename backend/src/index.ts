@@ -56,6 +56,12 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/leads', leadsRoutes);
 
+const liveRoutes = require('./routes/live');
+app.use('/api/live', liveRoutes);
+
+const dealsRoutes = require('./routes/deals');
+app.use('/api/deals', dealsRoutes);
+
 // Analytics nested under documents
 app.use('/api/documents', analyticsRoutes);
 

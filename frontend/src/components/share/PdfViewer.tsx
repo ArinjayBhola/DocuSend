@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { startView, trackPage, endView } from '../../api/share'
+import { startLiveSession, livePageChange, endLiveSession } from '../../api/live'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -34,6 +35,9 @@ export default function PdfViewer({ document, viewerEmail }) {
         totalPages: pdf.numPages,
       })
       viewIdRef.current = viewId
+
+      // Register live session (fire and forget)
+      startLiveSession({ viewId, documentId: document.id, viewerEmail: viewerEmail || null, totalPages: pdf.numPages }).catch(() => {})
 
       // Render all pages
       const container = containerRef.current
@@ -68,6 +72,7 @@ export default function PdfViewer({ document, viewerEmail }) {
             const timeSpent = Date.now() - pageStartRef.current
             if (viewIdRef.current && timeSpent > 500) {
               trackPage({ viewId: viewIdRef.current, pageNumber: currentPageRef.current, timeSpent })
+              livePageChange({ viewId: viewIdRef.current, pageNumber: pageNum, timeSpent }).catch(() => {})
             }
             currentPageRef.current = pageNum
             pageStartRef.current = Date.now()
@@ -96,6 +101,7 @@ export default function PdfViewer({ document, viewerEmail }) {
       if (viewIdRef.current) {
         const timeSpent = Date.now() - pageStartRef.current
         endView({ viewId: viewIdRef.current, pageNumber: currentPageRef.current, timeSpent })
+        endLiveSession({ viewId: viewIdRef.current })
       }
     }
   }, [document, viewerEmail])

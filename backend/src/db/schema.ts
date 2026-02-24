@@ -100,6 +100,40 @@ const subscriptions = sqliteTable('subscriptions', {
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
 
+const deals = sqliteTable('deals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: integer('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  accountName: text('account_name').notNull(),
+  stage: text('stage').notNull().default('prospecting'), // prospecting/discovery/proposal/negotiation/closed_won/closed_lost
+  value: real('value').default(0),
+  currency: text('currency').notNull().default('USD'),
+  closeDate: text('close_date'),
+  stageEnteredAt: text('stage_entered_at').notNull().$defaultFn(() => new Date().toISOString()),
+  healthStatus: text('health_status').notNull().default('healthy'), // healthy/at_risk/critical
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+const stakeholders = sqliteTable('stakeholders', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  dealId: integer('deal_id').notNull().references(() => deals.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  role: text('role').notNull().default('influencer'), // champion/decision_maker/influencer/blocker/legal/technical
+  addedManually: integer('added_manually', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+const dealActivities = sqliteTable('deal_activities', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  dealId: integer('deal_id').notNull().references(() => deals.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // stage_change/stakeholder_added/view_detected/risk_changed
+  description: text('description').notNull(),
+  metadata: text('metadata'), // JSON string
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 module.exports = {
   users,
   documents,
@@ -110,4 +144,7 @@ module.exports = {
   notifications,
   notificationPreferences,
   subscriptions,
+  deals,
+  stakeholders,
+  dealActivities,
 };

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Link } from 'react-router-dom'
-import { getLeads, getLeadsExportUrl } from '../api/leads'
+import { getLeads, exportLeadsCsv } from '../api/leads'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 
 function formatDuration(seconds: number) {
@@ -14,6 +14,7 @@ function formatDuration(seconds: number) {
 }
 
 function timeAgo(dateStr: string) {
+  if (!dateStr) return ''
   const now = new Date()
   const date = new Date(dateStr)
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
@@ -30,17 +31,40 @@ function timeAgo(dateStr: string) {
 export default function Leads() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [expandedLead, setExpandedLead] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     getLeads()
       .then(setData)
-      .catch(console.error)
+      .catch((err) => setError(err.message || 'Failed to load leads'))
       .finally(() => setLoading(false))
   }, [])
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await exportLeadsCsv()
+    } catch {
+      alert('Failed to export leads')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner />
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-neutral-50 px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+        <div className="max-w-7xl mx-auto text-center py-24">
+          <p className="text-red-500 font-medium">{error}</p>
+        </div>
+      </div>
+    )
+  }
 
   const filteredLeads = data?.leads?.filter((lead: any) =>
     lead.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -58,15 +82,18 @@ export default function Leads() {
               {data?.totalLeads || 0} contacts captured across your documents
             </p>
           </div>
-          <a
-            href={getLeadsExportUrl()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-neutral-900 text-white shadow-md hover:bg-neutral-800 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Export CSV
-          </a>
+          {data?.totalLeads > 0 && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-neutral-900 text-white shadow-md hover:bg-neutral-800 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          )}
         </div>
 
         {/* Stats cards */}
@@ -128,9 +155,8 @@ export default function Leads() {
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
                   {filteredLeads.map((lead: any) => (
-                    <>
+                    <Fragment key={lead.email}>
                       <tr
-                        key={lead.email}
                         onClick={() => setExpandedLead(expandedLead === lead.email ? null : lead.email)}
                         className="hover:bg-neutral-50 cursor-pointer transition-colors"
                       >
@@ -156,7 +182,7 @@ export default function Leads() {
                         </td>
                       </tr>
                       {expandedLead === lead.email && (
-                        <tr key={`${lead.email}-details`}>
+                        <tr>
                           <td colSpan={5} className="bg-neutral-50/50 px-5 py-3">
                             <div className="pl-11 space-y-2">
                               {lead.documents.map((doc: any) => (
@@ -178,7 +204,7 @@ export default function Leads() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
