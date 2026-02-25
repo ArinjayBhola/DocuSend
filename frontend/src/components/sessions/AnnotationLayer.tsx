@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 
 interface Annotation {
   id: number
@@ -20,10 +20,11 @@ interface Props {
   activeColor: string
   strokeWidth: number
   onAnnotationCreate: (annotation: { pageNumber: number; type: string; data: any; color: string }) => void
+  onAnnotationDelete: (annotationId: number) => void
 }
 
 export default function AnnotationLayer({
-  pageNumber, width, height, annotations, activeTool, activeColor, strokeWidth, onAnnotationCreate
+  pageNumber, width, height, annotations, activeTool, activeColor, strokeWidth, onAnnotationCreate, onAnnotationDelete
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [drawing, setDrawing] = useState(false)
@@ -34,6 +35,8 @@ export default function AnnotationLayer({
   const [commentPos, setCommentPos] = useState<{ x: number; y: number } | null>(null)
   const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null)
   const [textValue, setTextValue] = useState('')
+  const [pendingAnnotations, setPendingAnnotations] = useState<any[]>([])
+  const [hoveredId, setHoveredId] = useState<number | null>(null)
 
   const getRelativePos = useCallback((e: React.PointerEvent) => {
     const rect = svgRef.current!.getBoundingClientRect()
@@ -58,7 +61,7 @@ export default function AnnotationLayer({
     setStartPos(pos)
     setCurrentPos(pos)
 
-    if (activeTool === 'freehand') {
+    if (activeTool === 'pen') {
       setPoints([pos])
     }
 
@@ -70,7 +73,7 @@ export default function AnnotationLayer({
     const pos = getRelativePos(e)
     setCurrentPos(pos)
 
-    if (activeTool === 'freehand') {
+    if (activeTool === 'pen') {
       setPoints(prev => [...prev, pos])
     }
   }
@@ -81,10 +84,20 @@ export default function AnnotationLayer({
       return
     }
 
-    if (activeTool === 'freehand' && points.length > 2) {
+    if (activeTool === 'pen' && points.length > 2) {
+      const pendingId = Date.now()
+      const newAnnotation = {
+        id: pendingId,
+        pageNumber,
+        type: 'pen',
+        data: { points, strokeWidth },
+        color: activeColor,
+        isPending: true
+      }
+      setPendingAnnotations(prev => [...prev, newAnnotation])
       onAnnotationCreate({
         pageNumber,
-        type: 'freehand',
+        type: 'pen',
         data: { points, strokeWidth },
         color: activeColor,
       })
@@ -146,7 +159,20 @@ export default function AnnotationLayer({
     setTextValue('')
   }
 
-  const pageAnnotations = annotations.filter(a => a.pageNumber === pageNumber)
+  // Cleanup pending annotations when they are confirmed by the server
+  useEffect(() => {
+    setPendingAnnotations(prev => prev.filter(p => !annotations.some(a => 
+      a.pageNumber === p.pageNumber && 
+      a.type === p.type && 
+      a.color === p.color &&
+      JSON.stringify(a.data) === JSON.stringify(p.data)
+    )))
+  }, [annotations])
+
+  const pageAnnotations = [
+    ...annotations.filter(a => a.pageNumber === pageNumber), 
+    ...pendingAnnotations.filter(p => p.pageNumber === pageNumber)
+  ]
 
   return (
     <div className="absolute inset-0" style={{ pointerEvents: activeTool ? 'all' : 'none' }}>
@@ -155,46 +181,78 @@ export default function AnnotationLayer({
         width={width}
         height={height}
         className="absolute inset-0"
-        style={{ cursor: activeTool ? 'crosshair' : 'default' }}
+        style={{ 
+          cursor: activeTool === 'pen' 
+            ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'%3E%3C/path%3E%3C/svg%3E") 0 24, auto`
+            : activeTool === 'eraser'
+            ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z'%3E%3C/path%3E%3Cpath d='M17 17L7 7'%3E%3C/path%3E%3C/svg%3E") 0 24, auto`
+            : activeTool ? 'crosshair' : 'default',
+          touchAction: 'none'
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
         {/* Render existing annotations */}
         {pageAnnotations.map(a => {
+          const isEraser = activeTool === 'eraser';
+          const commonProps = {
+            onPointerDown: (e: React.PointerEvent) => {
+              if (isEraser) {
+                e.stopPropagation();
+                onAnnotationDelete(a.id);
+              }
+            },
+            className: `cursor-pointer transition-all duration-200 ${isEraser ? 'hover:opacity-40 group' : ''}`,
+            style: isEraser ? { filter: 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.4))' } : {}
+          };
+
           if (a.type === 'highlight') {
-            return a.data.rects?.map((r: any, i: number) => (
-              <rect key={`${a.id}-${i}`} x={r.x} y={r.y} width={r.width} height={r.height}
-                fill={a.color} fillOpacity={0.25} stroke={a.color} strokeWidth={1} strokeOpacity={0.5} />
-            ))
+            return (
+              <g key={a.id} {...commonProps}>
+                {a.data.rects?.map((r: any, i: number) => (
+                  <rect key={`${a.id}-${i}`} x={r.x} y={r.y} width={r.width} height={r.height}
+                    fill={a.color} fillOpacity={0.25} stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 1.5 : 1} strokeOpacity={isEraser ? 0.8 : 0.5} />
+                ))}
+              </g>
+            )
           }
-          if (a.type === 'freehand') {
+          if (a.type === 'pen') {
             const pts = a.data.points?.map((p: any) => `${p.x},${p.y}`).join(' ')
-            return <polyline key={a.id} points={pts} fill="none" stroke={a.color}
-              strokeWidth={a.data.strokeWidth || 2} strokeLinecap="round" strokeLinejoin="round" />
+            return (
+              <g key={a.id} {...commonProps}>
+                {/* Wider invisible stroke for easier hit detection */}
+                <polyline points={pts} fill="none" stroke="rgba(0,0,0,0)"
+                  strokeWidth={Math.max(a.data.strokeWidth || 2, 20)} strokeLinecap="round" strokeLinejoin="round" 
+                  pointerEvents="stroke" />
+                <polyline points={pts} fill="none" stroke={a.color}
+                  strokeWidth={a.data.strokeWidth || 2} strokeLinecap="round" strokeLinejoin="round" 
+                  className={`${isEraser ? 'group-hover:stroke-red-500' : ''} ${a.isPending ? 'opacity-70' : ''}`}
+                />
+              </g>
+            )
           }
           if (a.type === 'shape') {
             const d = a.data
+            let shape = null
             if (d.shapeType === 'rect') {
-              return <rect key={a.id} x={d.x} y={d.y} width={d.width} height={d.height}
-                fill="none" stroke={a.color} strokeWidth={2} />
+              shape = <rect x={d.x} y={d.y} width={d.width} height={d.height}
+                fill="none" stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} />
+            } else if (d.shapeType === 'ellipse') {
+              shape = <ellipse cx={d.x + d.width / 2} cy={d.y + d.height / 2}
+                rx={d.width / 2} ry={d.height / 2} fill="none" stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} />
+            } else if (d.shapeType === 'arrow') {
+              shape = <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+                stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} markerEnd={isEraser ? "" : "url(#arrowhead)"} />
             }
-            if (d.shapeType === 'ellipse') {
-              return <ellipse key={a.id} cx={d.x + d.width / 2} cy={d.y + d.height / 2}
-                rx={d.width / 2} ry={d.height / 2} fill="none" stroke={a.color} strokeWidth={2} />
-            }
-            if (d.shapeType === 'arrow') {
-              return <line key={a.id} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
-                stroke={a.color} strokeWidth={2} markerEnd="url(#arrowhead)" />
-            }
-            return null
+            return <g key={a.id} {...commonProps}>{shape}</g>
           }
           if (a.type === 'comment') {
             return (
-              <g key={a.id}>
-                <circle cx={a.data.x} cy={a.data.y} r={12} fill={a.color} fillOpacity={0.9} />
-                <text x={a.data.x} y={a.data.y + 4} textAnchor="middle" fill="white" fontSize={10} fontWeight="bold" style={{ pointerEvents: 'none' }}>
-                  ?
+              <g key={a.id} {...commonProps}>
+                <circle cx={a.data.x} cy={a.data.y} r={12} fill={isEraser ? '#EF4444' : a.color} fillOpacity={0.9} className="animate-in fade-in zoom-in duration-300" />
+                <text x={a.data.x} y={a.data.y + 4} textAnchor="middle" fill="white" fontSize={10} fontWeight="bold" style={{ pointerEvents: 'none' }} className="animate-in fade-in zoom-in duration-300 delay-100">
+                  {isEraser ? '×' : '?'}
                 </text>
                 <title>{a.data.text} — {a.userName}</title>
               </g>
@@ -202,8 +260,8 @@ export default function AnnotationLayer({
           }
           if (a.type === 'text') {
             return (
-              <foreignObject key={a.id} x={a.data.x} y={a.data.y} width={200} height={50}>
-                <div style={{ color: a.color, fontSize: a.data.fontSize || 16, fontWeight: 500 }}>
+              <foreignObject key={a.id} x={a.data.x} y={a.data.y} width={250} height={100} {...commonProps} className={`animate-in slide-in-from-top-1 duration-300 ${commonProps.className}`}>
+                <div style={{ color: isEraser ? '#EF4444' : a.color, fontSize: a.data.fontSize || 16, fontWeight: 500, lineHeight: 1.2, textDecoration: isEraser ? 'line-through' : 'none' }}>
                   {a.data.text}
                 </div>
               </foreignObject>
@@ -213,7 +271,7 @@ export default function AnnotationLayer({
         })}
 
         {/* Drawing preview */}
-        {drawing && activeTool === 'freehand' && points.length > 1 && (
+        {drawing && activeTool === 'pen' && points.length > 1 && (
           <polyline
             points={points.map(p => `${p.x},${p.y}`).join(' ')}
             fill="none" stroke={activeColor} strokeWidth={strokeWidth}
@@ -249,8 +307,8 @@ export default function AnnotationLayer({
       {/* Comment input popup */}
       {commentPos && (
         <div
-          className="absolute bg-white border border-neutral-300 rounded-lg shadow-lg p-3 z-50"
-          style={{ left: commentPos.x, top: commentPos.y + 16, minWidth: 200 }}
+          className="absolute bg-white/95 backdrop-blur border border-neutral-200 rounded-xl shadow-xl p-3 z-50 animate-in zoom-in-95 duration-200"
+          style={{ left: Math.min(commentPos.x, width - 220), top: Math.min(commentPos.y + 16, height - 120), minWidth: 200 }}
           onClick={e => e.stopPropagation()}
         >
           <textarea
@@ -258,14 +316,14 @@ export default function AnnotationLayer({
             value={commentText}
             onChange={e => setCommentText(e.target.value)}
             placeholder="Add a comment..."
-            className="w-full text-sm border border-neutral-200 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full text-sm border border-neutral-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
             rows={2}
           />
-          <div className="flex gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-2">
             <button onClick={() => { setCommentPos(null); setCommentText('') }}
-              className="text-xs text-neutral-500 hover:text-neutral-700">Cancel</button>
+              className="px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-700 transition-colors">Cancel</button>
             <button onClick={handleCommentSubmit}
-              className="text-xs bg-brand-600 text-white px-3 py-1 rounded hover:bg-brand-700">Add</button>
+              className="px-3 py-1 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm transition-colors">Add Comment</button>
           </div>
         </div>
       )}

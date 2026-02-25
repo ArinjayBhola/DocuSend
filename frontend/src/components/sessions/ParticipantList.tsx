@@ -14,19 +14,21 @@ export default function ParticipantList({ participants, currentUserId }: Props) 
   return (
     <div className="flex items-center gap-1">
       {participants.map(p => (
-        <div key={p.userId} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-neutral-100/80" title={`${p.name}${p.currentPage ? ` — Page ${p.currentPage}` : ''}`}>
+        <div key={p.userId} className="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-100/50 hover:bg-white hover:shadow-sm border border-transparent hover:border-neutral-200 transition-all duration-200" title={`${p.name}${p.currentPage ? ` — Page ${p.currentPage}` : ''}`}>
           <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white shadow-sm group-hover:scale-110 transition-transform"
             style={{ backgroundColor: p.color }}
           >
             {p.name.charAt(0).toUpperCase()}
           </div>
-          <span className="text-xs font-medium text-neutral-700 max-w-[80px] truncate">
-            {p.userId === currentUserId ? 'You' : p.name.split(' ')[0]}
-          </span>
-          {p.currentPage && (
-            <span className="text-[10px] text-neutral-400 font-mono">p{p.currentPage}</span>
-          )}
+          <div className="flex flex-col">
+            <span className="text-[11px] font-semibold text-neutral-800 max-w-[80px] truncate leading-tight">
+              {p.userId === currentUserId ? 'You' : p.name.split(' ')[0]}
+            </span>
+            {p.currentPage && (
+              <span className="text-[9px] text-neutral-400 font-medium uppercase tracking-wider">Page {p.currentPage}</span>
+            )}
+          </div>
         </div>
       ))}
     </div>

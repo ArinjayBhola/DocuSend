@@ -23,7 +23,7 @@ app.use(helmet());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: process.env.NODE_ENV === 'development' ? 10000 : 200,
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use(limiter);
@@ -75,8 +75,15 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  try {
+    const fs = require('fs');
+    const errorLog = `[${new Date().toISOString()}] ${req.method} ${req.url}\n${err.stack}\n\n`;
+    fs.appendFileSync('docusend_error.log', errorLog);
+  } catch (e) {
+    console.error('Failed to write to error log:', e);
+  }
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(500).json({ error: 'Something went wrong!', details: err.message });
 });
 
 app.listen(env.PORT, () => {

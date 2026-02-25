@@ -38,8 +38,11 @@ function broadcastToRoom(sessionId, data, excludeUserId = null) {
   }
 }
 
-function getParticipantColor(sessionId) {
+function getParticipantColor(sessionId, userId = null) {
   const room = activeRooms.get(sessionId);
+  if (room && userId && room.participants.has(userId)) {
+    return room.participants.get(userId).color;
+  }
   const usedColors = room ? [...room.participants.values()].map(p => p.color) : [];
   for (const c of COLORS) {
     if (!usedColors.includes(c)) return c;
@@ -250,7 +253,7 @@ router.post('/join', (req, res) => {
       return res.status(400).json({ error: 'Session is full' });
     }
 
-    const color = getParticipantColor(session.id);
+    const color = getParticipantColor(session.id, req.user.id);
     db.insert(sessionParticipants).values({
       sessionId: session.id,
       userId: req.user.id,
@@ -483,12 +486,29 @@ router.get('/:id/stream', (req, res) => {
 // POST /:id/presence — Update cursor + current page
 // ============================================================
 router.post('/:id/presence', (req, res) => {
-  const sessionId = parseInt(req.params.id);
-  const { currentPage, cursorX, cursorY } = req.body;
-  const room = activeRooms.get(sessionId);
-  if (!room) return res.json({ ok: true });
+  try {
+    const sessionId = parseInt(req.params.id);
+    const { currentPage, cursorX, cursorY } = req.body;
+    
+    if (!req.user) {
+      console.error('[Presence Error] No user in request');
+      return res.status(401).json({ error: 'User not found' });
+    }
 
+    const room = activeRooms.get(sessionId);
+    if (!room) return res.json({ ok: true });
+
+  // Verify participant
   const p = room.participants.get(req.user.id);
+  if (!p) {
+    // If not in memory but valid participant in DB, we should probably let them through
+    // or return 403. Better to be strict.
+    const exists = db.select().from(sessionParticipants)
+      .where(and(eq(sessionParticipants.sessionId, sessionId), eq(sessionParticipants.userId, req.user.id)))
+      .get();
+    if (!exists) return res.status(403).json({ error: 'Not a participant' });
+    return res.json({ ok: true }); // Just ignore if not active in stream yet
+  }
   if (p) {
     if (currentPage !== undefined) p.currentPage = currentPage;
     if (cursorX !== undefined) p.cursorX = cursorX;
@@ -505,7 +525,11 @@ router.post('/:id/presence', (req, res) => {
     cursorY: p?.cursorY,
   }, req.user.id);
 
-  res.json({ ok: true });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Presence Error]', err);
+    res.status(500).json({ error: 'Failed to update presence', details: err.message });
+  }
 });
 
 // ============================================================
@@ -547,9 +571,11 @@ router.put('/:id/annotations/:aid', (req, res) => {
     const annotationId = parseInt(req.params.aid);
     const { data, resolved } = req.body;
 
-    const updates = { updatedAt: new Date().toISOString() };
-    if (data !== undefined) updates.data = JSON.stringify(data);
-    if (resolved !== undefined) updates.resolved = resolved;
+    const updates = { 
+      updatedAt: new Date().toISOString(),
+      ...(data !== undefined && { data: JSON.stringify(data) }),
+      ...(resolved !== undefined && { resolved })
+    };
 
     db.update(annotations).set(updates).where(eq(annotations.id, annotationId)).run();
 
@@ -563,20 +589,26 @@ router.put('/:id/annotations/:aid', (req, res) => {
   }
 });
 
-// ============================================================
-// DELETE /:id/annotations/:aid — Delete annotation
-// ============================================================
 router.delete('/:id/annotations/:aid', (req, res) => {
   try {
     const sessionId = parseInt(req.params.id);
     const annotationId = parseInt(req.params.aid);
 
-    db.delete(annotations).where(eq(annotations.id, annotationId)).run();
+    if (!req.user) {
+      console.error('[Delete Annotation Error] No user in request');
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (isNaN(sessionId) || isNaN(annotationId)) {
+      return res.status(400).json({ error: 'Invalid session or annotation ID' });
+    }
+
+    db.delete(annotations).where(and(eq(annotations.id, annotationId), eq(annotations.sessionId, sessionId))).run();
     broadcastToRoom(sessionId, { type: 'annotation_deleted', annotationId });
     res.json({ ok: true });
   } catch (err) {
     console.error('[Delete Annotation Error]', err);
-    res.status(500).json({ error: 'Failed to delete annotation' });
+    res.status(500).json({ error: 'Failed to delete annotation', details: err.message });
   }
 });
 

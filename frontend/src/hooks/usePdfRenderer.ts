@@ -4,7 +4,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
-export default function usePdfRenderer(pdfUrl: string) {
+export default function usePdfRenderer(pdfUrl: string, scale: number = 1.5) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pageRefsMap = useRef<Map<number, HTMLDivElement>>(new Map())
   const [numPages, setNumPages] = useState(0)
@@ -19,6 +19,7 @@ export default function usePdfRenderer(pdfUrl: string) {
 
     async function loadPdf() {
       try {
+        setLoading(true)
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise
         if (cancelled) return
 
@@ -32,10 +33,10 @@ export default function usePdfRenderer(pdfUrl: string) {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i)
-          const viewport = page.getViewport({ scale: 1.5 })
+          const viewport = page.getViewport({ scale })
 
           const wrapper = document.createElement('div')
-          wrapper.className = 'pdf-page bg-white p-1 rounded-sm shadow-2xl relative'
+          wrapper.className = 'pdf-page bg-white p-1 rounded-sm shadow-2xl relative transition-all duration-300'
           wrapper.dataset.page = i.toString()
           wrapper.style.width = `${viewport.width}px`
           wrapper.style.height = `${viewport.height}px`
@@ -64,7 +65,7 @@ export default function usePdfRenderer(pdfUrl: string) {
               setCurrentPage(pageNum)
             }
           }
-        }, { threshold: 0.5 })
+        }, { threshold: 0.1 })
 
         observerRef.current = observer
         container.querySelectorAll('.pdf-page').forEach(el => observer.observe(el))
@@ -83,7 +84,7 @@ export default function usePdfRenderer(pdfUrl: string) {
       cancelled = true
       observerRef.current?.disconnect()
     }
-  }, [pdfUrl])
+  }, [pdfUrl, scale])
 
   return {
     loading,
