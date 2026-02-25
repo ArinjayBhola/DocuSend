@@ -1,0 +1,25 @@
+import { Router } from 'express';
+import { DealsController } from './deals.controller.js';
+import { asyncHandler } from '../../core/utils/asyncHandler.js';
+import { requireAuth, loadUser } from '../auth/index.js';
+import { checkDealLimit } from '../billing/index.js';
+
+const router = Router();
+const controller = new DealsController();
+
+router.use(requireAuth);
+router.use(loadUser);
+
+router.get('/', asyncHandler(controller.list));
+router.post('/', checkDealLimit, asyncHandler(controller.create));
+router.get('/:id', asyncHandler(controller.getOne));
+router.put('/:id', asyncHandler(controller.update));
+router.delete('/:id', asyncHandler(controller.delete));
+
+router.post('/:id/stakeholders', asyncHandler(controller.addStakeholder));
+router.post('/:id/detect-stakeholders', asyncHandler(controller.detectStakeholders));
+router.get('/:id/risk', asyncHandler(controller.getRisk));
+router.get('/:id/intent-graph', asyncHandler(controller.getIntentGraph));
+router.get('/:id/actions', asyncHandler(controller.getActions));
+
+export default router;

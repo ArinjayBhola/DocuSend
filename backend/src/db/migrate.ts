@@ -1,11 +1,15 @@
-const Database = require("better-sqlite3");
-const path = require("path");
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const dbPath = path.join(__dirname, "..", "..", "docusend.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dbPath = path.join(__dirname, '..', '..', 'docusend.db');
 const db = new Database(dbPath);
 
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 // Create all tables
 db.exec(`
@@ -223,5 +227,5 @@ try {
   // Column already exists — ignore
 }
 
-console.log("Database migrated successfully!");
+console.log('Database migrated successfully!');
 db.close();

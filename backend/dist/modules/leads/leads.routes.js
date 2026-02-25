@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { LeadsController } from './leads.controller.js';
+import { asyncHandler } from '../../core/utils/asyncHandler.js';
+import { requireAuth } from '../auth/index.js';
+const router = Router();
+const controller = new LeadsController();
+router.use(requireAuth);
+router.get('/', asyncHandler(controller.list));
+router.get('/export', asyncHandler(controller.export));
+export default router;

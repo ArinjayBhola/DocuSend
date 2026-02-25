@@ -1,15 +1,15 @@
-const nodemailer = require("nodemailer");
-const env = require("../config/env");
+import nodemailer from 'nodemailer';
+import { env } from '../config/env.js';
 
-let transporter = null;
+let transporter: any = null;
 
 function getTransporter() {
   if (transporter) return transporter;
   if (!env.SMTP_USER || !env.SMTP_PASS) return null;
 
   transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
+    host: env.SMTP_HOST as string,
+    port: env.SMTP_PORT as number,
     secure: env.SMTP_PORT === 465,
     auth: {
       user: env.SMTP_USER,
@@ -19,7 +19,7 @@ function getTransporter() {
   return transporter;
 }
 
-async function sendEmail({ to, subject, html }) {
+export async function sendEmail({ to, subject, html }: { to: string, subject: string, html: string }) {
   const transport = getTransporter();
   if (!transport) {
     console.log(`[Email] Would send to ${to}: ${subject}`);
@@ -33,7 +33,7 @@ async function sendEmail({ to, subject, html }) {
   });
 }
 
-async function sendViewNotification({ ownerEmail, documentTitle, viewerEmail, viewerIp }) {
+export async function sendViewNotification({ ownerEmail, documentTitle, viewerEmail, viewerIp }: { ownerEmail: string, documentTitle: string, viewerEmail: string | null, viewerIp: string }) {
   await sendEmail({
     to: ownerEmail,
     subject: `Someone viewed "${documentTitle}" on DocuSend`,
@@ -46,5 +46,3 @@ async function sendViewNotification({ ownerEmail, documentTitle, viewerEmail, vi
     `,
   });
 }
-
-module.exports = { sendEmail, sendViewNotification };

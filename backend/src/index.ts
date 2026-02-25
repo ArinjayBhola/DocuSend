@@ -1,32 +1,53 @@
-const env = require("./config/env");
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const helmet = require("helmet");
-const cors = require("cors");
-const rateLimit = require("express-rate-limit");
-const path = require("path");
+import { env } from './config/env.js';
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Run migrations on startup
-require("./db/migrate");
+import './db/migrate.js';
+
+import { authRoutes } from './modules/auth/index.js';
+import { billingRoutes } from './modules/billing/index.js';
+import { documentsRoutes } from './modules/documents/index.js';
+import { dealsRoutes } from './modules/deals/index.js';
+import { leadsRoutes } from './modules/leads/index.js';
+import { workspacesRoutes } from './modules/workspaces/index.js';
+import { sessionsRoutes } from './modules/sessions/index.js';
+import { analyticsRoutes } from './modules/analytics/index.js';
+import { dashboardRoutes } from './modules/dashboard/index.js';
+import { liveRoutes } from './modules/live/index.js';
+import { notificationsRoutes } from './modules/notifications/index.js';
+import { shareRoutes } from './modules/share/index.js';
+
+import { errorMiddleware } from './core/middlewares/error.middleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // CORS
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: 'http://localhost:5173',
     credentials: true,
   }),
 );
 
 // Security
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Allow local file serving if needed
+}));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === "development" ? 10000 : 200,
-  message: { error: "Too many requests, please try again later." },
+  max: process.env.NODE_ENV === 'development' ? 10000 : 200,
+  message: { error: 'Too many requests, please try again later.' },
 });
 app.use(limiter);
 
@@ -36,56 +57,28 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(env.COOKIE_SECRET));
 
 // Static files (for uploaded PDFs)
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
-const authRoutes = require("./routes/auth");
-const dashboardRoutes = require("./routes/dashboard");
-const documentRoutes = require("./routes/documents");
-const shareRoutes = require("./routes/share");
-const analyticsRoutes = require("./routes/analytics");
-const workspaceRoutes = require("./routes/workspaces");
-const billingRoutes = require("./routes/billing");
-const notificationRoutes = require("./routes/notifications");
-const leadsRoutes = require("./routes/leads");
+app.use('/api/auth', authRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/documents', documentsRoutes);
+app.use('/api/share', shareRoutes);
+app.use('/api/workspaces', workspacesRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/leads', leadsRoutes);
+app.use('/api/live', liveRoutes);
+app.use('/api/deals', dealsRoutes);
+app.use('/api/sessions', sessionsRoutes);
+app.use('/api/analytics', analyticsRoutes); 
 
-app.use("/api/auth", authRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/documents", documentRoutes);
-app.use("/api/share", shareRoutes);
-app.use("/api/workspaces", workspaceRoutes);
-app.use("/api/billing", billingRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/leads", leadsRoutes);
-
-const liveRoutes = require("./routes/live");
-app.use("/api/live", liveRoutes);
-
-const dealsRoutes = require("./routes/deals");
-app.use("/api/deals", dealsRoutes);
-
-const sessionsRoutes = require("./routes/sessions");
-app.use("/api/sessions", sessionsRoutes);
-
-// Analytics nested under documents
-app.use("/api/documents", analyticsRoutes);
+// Global Error Handler
+app.use(errorMiddleware);
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ error: "Not found" });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  try {
-    const fs = require("fs");
-    const errorLog = `[${new Date().toISOString()}] ${req.method} ${req.url}\n${err.stack}\n\n`;
-    fs.appendFileSync("docusend_error.log", errorLog);
-  } catch (e) {
-    console.error("Failed to write to error log:", e);
-  }
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!", details: err.message });
+  res.status(404).json({ error: 'Not found' });
 });
 
 app.listen(env.PORT, () => {

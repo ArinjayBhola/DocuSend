@@ -1,15 +1,18 @@
-const { drizzle } = require("drizzle-orm/better-sqlite3");
-const Database = require("better-sqlite3");
-const path = require("path");
-const schema = require("../db/schema");
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as schema from '../db/schema.js';
 
-const dbPath = path.join(__dirname, "..", "..", "docusend.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dbPath = path.join(__dirname, '..', '..', 'docusend.db');
 const sqlite = new Database(dbPath);
 
 // Enable WAL mode for better concurrent performance
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+sqlite.pragma('journal_mode = WAL');
+sqlite.pragma('foreign_keys = ON');
 
-const db = drizzle(sqlite, { schema });
-
-module.exports = { db, sqlite };
+export const db = drizzle(sqlite, { schema });
+export { sqlite };

@@ -1,25 +1,26 @@
-const jwt = require("jsonwebtoken");
-const { eq } = require("drizzle-orm");
-const env = require("../config/env");
-const { db } = require("../config/db");
-const { users } = require("../db/schema");
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
+import { env } from '../config/env.js';
+import { db } from '../config/db.js';
+import { users } from '../db/schema.js';
 
-function requireAuth(req, res, next) {
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.token;
   if (!token) {
-    return res.status(401).json({ error: "Authentication required" });
+    return res.status(401).json({ error: 'Authentication required' });
   }
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const payload = jwt.verify(token, env.JWT_SECRET) as { userId: number };
     req.userId = payload.userId;
     next();
   } catch {
-    res.clearCookie("token");
-    return res.status(401).json({ error: "Invalid or expired token" });
+    res.clearCookie('token');
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
-async function loadUser(req, res, next) {
+export async function loadUser(req: Request, res: Response, next: NextFunction) {
   if (!req.userId) return next();
   try {
     const [user] = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
@@ -32,16 +33,14 @@ async function loadUser(req, res, next) {
   next();
 }
 
-function optionalAuth(req, res, next) {
+export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.token;
   if (!token) return next();
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const payload = jwt.verify(token, env.JWT_SECRET) as { userId: number };
     req.userId = payload.userId;
   } catch {
     // ignore
   }
   next();
 }
-
-module.exports = { requireAuth, loadUser, optionalAuth };
