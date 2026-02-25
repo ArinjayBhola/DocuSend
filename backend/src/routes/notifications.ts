@@ -1,23 +1,26 @@
-const express = require('express');
-const { eq, desc, and, sql } = require('drizzle-orm');
-const { db } = require('../config/db');
-const { notifications, notificationPreferences } = require('../db/schema');
-const { requireAuth } = require('../middleware/auth');
+const express = require("express");
+const { eq, desc, and, sql } = require("drizzle-orm");
+const { db } = require("../config/db");
+const { notifications, notificationPreferences } = require("../db/schema");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
 // Get all notifications for user
-router.get('/', requireAuth, (req, res) => {
-  const items = db.select()
+router.get("/", requireAuth, (req, res) => {
+  const items = db
+    .select()
     .from(notifications)
     .where(eq(notifications.userId, req.userId))
     .orderBy(desc(notifications.createdAt))
     .limit(50)
     .all();
 
-  const unreadCount = db.select({
-    count: sql`count(*)`,
-  }).from(notifications)
+  const unreadCount = db
+    .select({
+      count: sql`count(*)`,
+    })
+    .from(notifications)
     .where(and(eq(notifications.userId, req.userId), eq(notifications.isRead, false)))
     .get();
 
@@ -25,10 +28,12 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // Get unread count only (lightweight poll)
-router.get('/unread-count', requireAuth, (req, res) => {
-  const result = db.select({
-    count: sql`count(*)`,
-  }).from(notifications)
+router.get("/unread-count", requireAuth, (req, res) => {
+  const result = db
+    .select({
+      count: sql`count(*)`,
+    })
+    .from(notifications)
     .where(and(eq(notifications.userId, req.userId), eq(notifications.isRead, false)))
     .get();
 
@@ -36,7 +41,7 @@ router.get('/unread-count', requireAuth, (req, res) => {
 });
 
 // Mark notification as read
-router.post('/:id/read', requireAuth, (req, res) => {
+router.post("/:id/read", requireAuth, (req, res) => {
   db.update(notifications)
     .set({ isRead: true })
     .where(and(eq(notifications.id, parseInt(req.params.id)), eq(notifications.userId, req.userId)))
@@ -46,7 +51,7 @@ router.post('/:id/read', requireAuth, (req, res) => {
 });
 
 // Mark all as read
-router.post('/read-all', requireAuth, (req, res) => {
+router.post("/read-all", requireAuth, (req, res) => {
   db.update(notifications)
     .set({ isRead: true })
     .where(and(eq(notifications.userId, req.userId), eq(notifications.isRead, false)))
@@ -56,50 +61,35 @@ router.post('/read-all', requireAuth, (req, res) => {
 });
 
 // Get notification preferences
-router.get('/preferences', requireAuth, (req, res) => {
-  let prefs = db.select()
-    .from(notificationPreferences)
-    .where(eq(notificationPreferences.userId, req.userId))
-    .get();
+router.get("/preferences", requireAuth, (req, res) => {
+  let prefs = db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, req.userId)).get();
 
   if (!prefs) {
     db.insert(notificationPreferences).values({ userId: req.userId }).run();
-    prefs = db.select()
-      .from(notificationPreferences)
-      .where(eq(notificationPreferences.userId, req.userId))
-      .get();
+    prefs = db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, req.userId)).get();
   }
 
   res.json({ preferences: prefs });
 });
 
 // Update notification preferences
-router.put('/preferences', requireAuth, (req, res) => {
+router.put("/preferences", requireAuth, (req, res) => {
   const { emailOnView, emailOnEmailCapture, inAppNotifications } = req.body;
 
-  let prefs = db.select()
-    .from(notificationPreferences)
-    .where(eq(notificationPreferences.userId, req.userId))
-    .get();
+  let prefs = db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, req.userId)).get();
 
   if (!prefs) {
     db.insert(notificationPreferences).values({ userId: req.userId }).run();
   }
 
   const updates = {};
-  if (typeof emailOnView === 'boolean') updates.emailOnView = emailOnView;
-  if (typeof emailOnEmailCapture === 'boolean') updates.emailOnEmailCapture = emailOnEmailCapture;
-  if (typeof inAppNotifications === 'boolean') updates.inAppNotifications = inAppNotifications;
+  if (typeof emailOnView === "boolean") updates.emailOnView = emailOnView;
+  if (typeof emailOnEmailCapture === "boolean") updates.emailOnEmailCapture = emailOnEmailCapture;
+  if (typeof inAppNotifications === "boolean") updates.inAppNotifications = inAppNotifications;
 
-  db.update(notificationPreferences)
-    .set(updates)
-    .where(eq(notificationPreferences.userId, req.userId))
-    .run();
+  db.update(notificationPreferences).set(updates).where(eq(notificationPreferences.userId, req.userId)).run();
 
-  const updated = db.select()
-    .from(notificationPreferences)
-    .where(eq(notificationPreferences.userId, req.userId))
-    .get();
+  const updated = db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, req.userId)).get();
 
   res.json({ preferences: updated });
 });

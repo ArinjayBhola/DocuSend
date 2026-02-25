@@ -1,8 +1,8 @@
-const express = require('express');
-const { eq, sql, desc, isNotNull, and } = require('drizzle-orm');
-const { db } = require('../config/db');
-const { documents, documentViews } = require('../db/schema');
-const { requireAuth } = require('../middleware/auth');
+const express = require("express");
+const { eq, sql, desc, isNotNull, and } = require("drizzle-orm");
+const { db } = require("../config/db");
+const { documents, documentViews } = require("../db/schema");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -14,26 +14,29 @@ function escapeCSV(val) {
 }
 
 // Get all captured leads for user
-router.get('/', requireAuth, (req, res) => {
+router.get("/", requireAuth, (req, res) => {
   try {
-    const leads = db.select({
-      email: documentViews.viewerEmail,
-      documentTitle: documents.title,
-      documentId: documents.id,
-      shareSlug: documents.shareSlug,
-      viewCount: sql`cast(count(*) as integer)`.as('view_count'),
-      totalDuration: sql`cast(coalesce(sum(${documentViews.duration}), 0) as integer)`.as('total_duration'),
-      firstViewedAt: sql`min(${documentViews.viewedAt})`.as('first_viewed_at'),
-      lastViewedAt: sql`max(${documentViews.viewedAt})`.as('last_viewed_at'),
-      avgPagesViewed: sql`round(avg(${documentViews.pagesViewed}), 1)`.as('avg_pages_viewed'),
-    })
+    const leads = db
+      .select({
+        email: documentViews.viewerEmail,
+        documentTitle: documents.title,
+        documentId: documents.id,
+        shareSlug: documents.shareSlug,
+        viewCount: sql`cast(count(*) as integer)`.as("view_count"),
+        totalDuration: sql`cast(coalesce(sum(${documentViews.duration}), 0) as integer)`.as("total_duration"),
+        firstViewedAt: sql`min(${documentViews.viewedAt})`.as("first_viewed_at"),
+        lastViewedAt: sql`max(${documentViews.viewedAt})`.as("last_viewed_at"),
+        avgPagesViewed: sql`round(avg(${documentViews.pagesViewed}), 1)`.as("avg_pages_viewed"),
+      })
       .from(documentViews)
       .innerJoin(documents, eq(documentViews.documentId, documents.id))
-      .where(and(
-        eq(documents.userId, req.userId),
-        isNotNull(documentViews.viewerEmail),
-        sql`${documentViews.viewerEmail} != ''`
-      ))
+      .where(
+        and(
+          eq(documents.userId, req.userId),
+          isNotNull(documentViews.viewerEmail),
+          sql`${documentViews.viewerEmail} != ''`,
+        ),
+      )
       .groupBy(documentViews.viewerEmail, documents.id)
       .orderBy(desc(sql`max(${documentViews.viewedAt})`))
       .all();
@@ -74,44 +77,50 @@ router.get('/', requireAuth, (req, res) => {
       totalViews: result.reduce((sum, l) => sum + l.totalViews, 0),
     });
   } catch (err) {
-    console.error('[Leads Error]', err);
-    res.status(500).json({ error: 'Failed to fetch leads' });
+    console.error("[Leads Error]", err);
+    res.status(500).json({ error: "Failed to fetch leads" });
   }
 });
 
 // Export leads as CSV
-router.get('/export', requireAuth, (req, res) => {
+router.get("/export", requireAuth, (req, res) => {
   try {
-    const leads = db.select({
-      email: documentViews.viewerEmail,
-      documentTitle: documents.title,
-      viewCount: sql`cast(count(*) as integer)`.as('view_count'),
-      totalDuration: sql`cast(coalesce(sum(${documentViews.duration}), 0) as integer)`.as('total_duration'),
-      firstViewedAt: sql`min(${documentViews.viewedAt})`.as('first_viewed_at'),
-      lastViewedAt: sql`max(${documentViews.viewedAt})`.as('last_viewed_at'),
-    })
+    const leads = db
+      .select({
+        email: documentViews.viewerEmail,
+        documentTitle: documents.title,
+        viewCount: sql`cast(count(*) as integer)`.as("view_count"),
+        totalDuration: sql`cast(coalesce(sum(${documentViews.duration}), 0) as integer)`.as("total_duration"),
+        firstViewedAt: sql`min(${documentViews.viewedAt})`.as("first_viewed_at"),
+        lastViewedAt: sql`max(${documentViews.viewedAt})`.as("last_viewed_at"),
+      })
       .from(documentViews)
       .innerJoin(documents, eq(documentViews.documentId, documents.id))
-      .where(and(
-        eq(documents.userId, req.userId),
-        isNotNull(documentViews.viewerEmail),
-        sql`${documentViews.viewerEmail} != ''`
-      ))
+      .where(
+        and(
+          eq(documents.userId, req.userId),
+          isNotNull(documentViews.viewerEmail),
+          sql`${documentViews.viewerEmail} != ''`,
+        ),
+      )
       .groupBy(documentViews.viewerEmail, documents.id)
       .orderBy(desc(sql`max(${documentViews.viewedAt})`))
       .all();
 
-    const header = 'Email,Document,Views,Total Duration (s),First Viewed,Last Viewed\n';
-    const rows = leads.map(l =>
-      `${escapeCSV(l.email)},${escapeCSV(l.documentTitle)},${Number(l.viewCount) || 0},${Number(l.totalDuration) || 0},${escapeCSV(l.firstViewedAt)},${escapeCSV(l.lastViewedAt)}`
-    ).join('\n');
+    const header = "Email,Document,Views,Total Duration (s),First Viewed,Last Viewed\n";
+    const rows = leads
+      .map(
+        (l) =>
+          `${escapeCSV(l.email)},${escapeCSV(l.documentTitle)},${Number(l.viewCount) || 0},${Number(l.totalDuration) || 0},${escapeCSV(l.firstViewedAt)},${escapeCSV(l.lastViewedAt)}`,
+      )
+      .join("\n");
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=docusend-leads.csv');
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=docusend-leads.csv");
     res.send(header + rows);
   } catch (err) {
-    console.error('[Leads Export Error]', err);
-    res.status(500).json({ error: 'Failed to export leads' });
+    console.error("[Leads Export Error]", err);
+    res.status(500).json({ error: "Failed to export leads" });
   }
 });
 

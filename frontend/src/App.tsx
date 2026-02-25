@@ -35,6 +35,11 @@ export default function App() {
           <Route path="/s/:slug" element={<ShareViewer />} />
           <Route path="/w/:slug" element={<ShareWorkspace />} />
 
+          {/* Session room — no layout (full-screen experience) */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/sessions/:id" element={<SessionRoom />} />
+          </Route>
+
           {/* Routes with layout */}
           <Route element={<Layout />}>
             <Route path="/" element={<Landing />} />
@@ -57,7 +62,6 @@ export default function App() {
               <Route path="/deals/:id" element={<DealDetail />} />
               <Route path="/sessions" element={<Sessions />} />
               <Route path="/sessions/new" element={<SessionNew />} />
-              <Route path="/sessions/:id" element={<SessionRoom />} />
               <Route path="/live" element={<LiveDashboard />} />
               <Route path="/notifications/settings" element={<NotificationSettings />} />
             </Route>

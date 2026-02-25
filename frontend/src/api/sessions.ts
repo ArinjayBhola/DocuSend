@@ -36,3 +36,12 @@ export const getMessages = (id: number) => get(`/sessions/${id}/messages`)
 
 export const sendTyping = (id: number, isTyping: boolean) =>
   post(`/sessions/${id}/typing`, { isTyping })
+
+export const toggleHandRaise = (id: number) =>
+  post(`/sessions/${id}/hand-raise`, {})
+
+export const toggleScreenShare = (id: number) =>
+  post(`/sessions/${id}/screen-share`, {})
+
+export const sendSignal = (id: number, data: { targetUserId: number; type: string; payload: any }) =>
+  post(`/sessions/${id}/signal`, data)

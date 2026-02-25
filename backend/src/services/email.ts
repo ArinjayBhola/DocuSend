@@ -1,5 +1,5 @@
-const nodemailer = require('nodemailer');
-const env = require('../config/env');
+const nodemailer = require("nodemailer");
+const env = require("../config/env");
 
 let transporter = null;
 
@@ -39,7 +39,7 @@ async function sendViewNotification({ ownerEmail, documentTitle, viewerEmail, vi
     subject: `Someone viewed "${documentTitle}" on DocuSend`,
     html: `
       <h2>New View on "${documentTitle}"</h2>
-      <p><strong>Viewer:</strong> ${viewerEmail || 'Anonymous'}</p>
+      <p><strong>Viewer:</strong> ${viewerEmail || "Anonymous"}</p>
       <p><strong>IP:</strong> ${viewerIp}</p>
       <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
       <p><a href="${env.APP_URL}/dashboard">View Analytics →</a></p>

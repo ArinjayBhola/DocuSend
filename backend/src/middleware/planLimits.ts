@@ -1,13 +1,14 @@
-const { eq, sql, and } = require('drizzle-orm');
-const { db } = require('../config/db');
-const { documents } = require('../db/schema');
-const { getPlanLimits } = require('../utils/helpers');
+const { eq, sql, and } = require("drizzle-orm");
+const { db } = require("../config/db");
+const { documents } = require("../db/schema");
+const { getPlanLimits } = require("../utils/helpers");
 
 function checkDocumentLimit(req, res, next) {
   const limits = getPlanLimits(req.user.plan);
   if (limits.documents === Infinity) return next();
 
-  const result = db.select({ count: sql`count(*)` })
+  const result = db
+    .select({ count: sql`count(*)` })
     .from(documents)
     .where(eq(documents.userId, req.user.id))
     .get();
@@ -25,7 +26,7 @@ function checkWorkspaceLimit(req, res, next) {
   if (limits.workspaces === Infinity) return next();
   if (limits.workspaces === 0) {
     return res.status(403).json({
-      error: 'Workspaces are not available on the free plan. Upgrade to Pro or Business.',
+      error: "Workspaces are not available on the free plan. Upgrade to Pro or Business.",
     });
   }
   next();
@@ -36,12 +37,13 @@ function checkDealLimit(req, res, next) {
   if (limits.deals === Infinity) return next();
   if (limits.deals === 0) {
     return res.status(403).json({
-      error: 'Deal Intelligence is not available on the free plan. Upgrade to Pro or Business.',
+      error: "Deal Intelligence is not available on the free plan. Upgrade to Pro or Business.",
     });
   }
 
-  const { deals } = require('../db/schema');
-  const result = db.select({ count: sql`count(*)` })
+  const { deals } = require("../db/schema");
+  const result = db
+    .select({ count: sql`count(*)` })
     .from(deals)
     .where(eq(deals.userId, req.user.id))
     .get();
@@ -59,12 +61,13 @@ function checkSessionLimit(req, res, next) {
   if (limits.sessions === Infinity) return next();
   if (limits.sessions === 0) {
     return res.status(403).json({
-      error: 'Collaborative Sessions are not available on the free plan. Upgrade to Pro or Business.',
+      error: "Collaborative Sessions are not available on the free plan. Upgrade to Pro or Business.",
     });
   }
 
-  const { sessions } = require('../db/schema');
-  const result = db.select({ count: sql`count(*)` })
+  const { sessions } = require("../db/schema");
+  const result = db
+    .select({ count: sql`count(*)` })
     .from(sessions)
     .where(and(eq(sessions.userId, req.user.id), sql`status != 'ended'`))
     .get();

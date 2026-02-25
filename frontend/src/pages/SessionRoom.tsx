@@ -1,10 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import usePdfRenderer from '../hooks/usePdfRenderer'
+import useFileRenderer from '../hooks/useFileRenderer'
+import useVoiceChat from '../hooks/useVoiceChat'
 import {
   getSession, startSession, endSession, leaveSession,
-  updatePresence, createAnnotation, deleteAnnotation, sendMessage, sendTyping
+  updatePresence, createAnnotation, deleteAnnotation, sendMessage, sendTyping,
+  toggleHandRaise, toggleScreenShare
 } from '../api/sessions'
 import AnnotationToolbar from '../components/sessions/AnnotationToolbar'
 import AnnotationLayer from '../components/sessions/AnnotationLayer'
@@ -29,15 +32,42 @@ export default function SessionRoom() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const chatCollapsedRef = useRef(false)
+  const [handRaisedUsers, setHandRaisedUsers] = useState<Set<number>>(new Set())
+  const [screenSharingUsers, setScreenSharingUsers] = useState<Set<number>>(new Set())
+
+  // Keep ref in sync for SSE closure
+  useEffect(() => { chatCollapsedRef.current = chatCollapsed }, [chatCollapsed])
 
   // Annotation tool state
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [activeColor, setActiveColor] = useState('#3B82F6')
   const [strokeWidth, setStrokeWidth] = useState(2)
   const [scale, setScale] = useState(1.5)
+  const [pdfReady, setPdfReady] = useState(0) // increments to force overlay re-render after PDF load
 
   const eventSourceRef = useRef<EventSource | null>(null)
   const presenceThrottleRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const participantsRef = useRef<any[]>([])
+
+  // Keep ref in sync for use in SSE closure
+  useEffect(() => { participantsRef.current = participants }, [participants])
+
+  // Voice chat signal handler ref — set by useVoiceChat callback
+  const voiceSignalHandlerRef = useRef<((data: any) => void) | null>(null)
+
+  // Voice chat
+  const { isActive: voiceActive, isMuted: voiceMuted, toggleMute, startVoice, stopVoice, speakingUsers, peerStates } = useVoiceChat(
+    sessionId,
+    user?.id || 0,
+    participants,
+    (handler) => { voiceSignalHandlerRef.current = handler }
+  )
+
+  // Track which users are muted (for UI display) — only local user for now
+  const mutedUsers = voiceMuted ? new Set([user!.id]) : new Set<number>()
 
   // Load session detail
   useEffect(() => {
@@ -53,9 +83,10 @@ export default function SessionRoom() {
       })
   }, [sessionId])
 
-  // PDF renderer
-  const pdfUrl = session ? `/api/share/pdf/${session.shareSlug}` : ''
-  const { loading: pdfLoading, error: pdfError, numPages, currentPage, currentPageRef, containerRef, pageRefsMap } = usePdfRenderer(pdfUrl)
+  // File renderer — supports both PDF and images
+  const fileUrl = session ? `/api/share/pdf/${session.shareSlug}` : ''
+  const fileType = session?.fileType || 'pdf'
+  const { loading: pdfLoading, error: pdfError, numPages, currentPage, currentPageRef, containerRef, pageRefsMap } = useFileRenderer(fileUrl, fileType, scale)
 
   // SSE connection
   useEffect(() => {
@@ -97,7 +128,7 @@ export default function SessionRoom() {
               return [...existing, {
                 userId: data.userId,
                 name: data.name,
-                color: participants.find(p => p.userId === data.userId)?.color || '#3B82F6',
+                color: participantsRef.current.find(p => p.userId === data.userId)?.color || '#3B82F6',
                 cursorX: data.cursorX,
                 cursorY: data.cursorY,
                 currentPage: data.currentPage,
@@ -119,6 +150,9 @@ export default function SessionRoom() {
 
           case 'message_created':
             setMessages(prev => [...prev, data.message])
+            if (chatCollapsedRef.current && data.message.userId !== user!.id) {
+              setUnreadCount(prev => prev + 1)
+            }
             break
 
           case 'typing_start':
@@ -137,7 +171,30 @@ export default function SessionRoom() {
             break
 
           case 'session_ended':
-            setSession(prev => prev ? { ...prev, status: 'ended' } : prev)
+            // Session has been deleted — navigate away
+            navigate('/sessions')
+            break
+
+          case 'hand_raise':
+            setHandRaisedUsers(prev => {
+              const next = new Set(prev)
+              if (data.raised) next.add(data.userId)
+              else next.delete(data.userId)
+              return next
+            })
+            break
+
+          case 'screen_share':
+            setScreenSharingUsers(prev => {
+              const next = new Set(prev)
+              if (data.sharing) next.add(data.userId)
+              else next.delete(data.userId)
+              return next
+            })
+            break
+
+          case 'signal':
+            voiceSignalHandlerRef.current?.(data)
             break
         }
       } catch { /* ignore parse errors */ }
@@ -152,6 +209,15 @@ export default function SessionRoom() {
       eventSourceRef.current = null
     }
   }, [session?.id])
+
+  // Re-render overlays when PDF finishes loading (e.g. after zoom)
+  useEffect(() => {
+    if (!pdfLoading && numPages > 0) {
+      // Small delay to ensure DOM has updated page wrapper dimensions
+      const t = setTimeout(() => setPdfReady(n => n + 1), 100)
+      return () => clearTimeout(t)
+    }
+  }, [pdfLoading, numPages, scale])
 
   // Send presence updates on page change
   useEffect(() => {
@@ -233,6 +299,14 @@ export default function SessionRoom() {
     sendTyping(sessionId, isTyping).catch(() => {})
   }, [sessionId])
 
+  const handleHandRaise = useCallback(() => {
+    toggleHandRaise(sessionId).catch(() => {})
+  }, [sessionId])
+
+  const handleScreenShare = useCallback(() => {
+    toggleScreenShare(sessionId).catch(() => {})
+  }, [sessionId])
+
   const handleStart = async () => {
     try {
       await startSession(sessionId)
@@ -242,9 +316,10 @@ export default function SessionRoom() {
   }
 
   const handleEnd = async () => {
-    if (!confirm('End this session for all participants?')) return
+    if (!confirm('End this session for all participants? All data will be permanently deleted.')) return
     try {
       await endSession(sessionId)
+      navigate('/sessions')
     } catch (err: any) {
       setError(err.message)
     }
@@ -346,10 +421,15 @@ export default function SessionRoom() {
 
   // Active session — main room
   return (
-    <div className="fixed inset-0 z-0 flex flex-col bg-white pt-20">
+    <div className="fixed inset-0 z-0 flex flex-col bg-white">
       {/* Top bar */}
       <div className="bg-white/95 backdrop-blur-sm border-b border-neutral-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-6">
+          <button onClick={() => navigate('/sessions')} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-700 transition-colors" title="Back to Sessions">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+          </button>
           <div className="flex flex-col">
             <h2 className="text-sm font-bold text-neutral-900 truncate max-w-[250px] leading-tight">{session?.title}</h2>
             <div className="flex items-center gap-2 mt-1">
@@ -379,7 +459,7 @@ export default function SessionRoom() {
             </div>
           </div>
           <div className="h-8 w-px bg-neutral-200 mx-2" />
-          <ParticipantList participants={participants} currentUserId={user!.id} />
+          <ParticipantList participants={participants} currentUserId={user!.id} handRaisedUsers={handRaisedUsers} screenSharingUsers={screenSharingUsers} speakingUsers={speakingUsers} mutedUsers={mutedUsers} />
         </div>
 
         <div className="flex items-center gap-3">
@@ -405,6 +485,26 @@ export default function SessionRoom() {
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex items-center gap-1 bg-neutral-50 border border-neutral-200 rounded-lg px-1.5 py-1 shadow-sm">
+            <button
+              onClick={handleHandRaise}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-all active:scale-90 ${handRaisedUsers.has(user!.id) ? 'bg-amber-100 text-amber-600' : 'text-neutral-500 hover:text-amber-600 hover:bg-amber-50'}`}
+              title={handRaisedUsers.has(user!.id) ? 'Lower hand' : 'Raise hand'}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.05 4.575a1.575 1.575 0 10-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 013.15 0v1.5m-3.15 0l.075 5.925m3.075-5.925v3m0-3a1.575 1.575 0 013.15 0v3m0 0v.375c0 1.036.16 2.064.468 3.043M7.05 7.575v.375a13.342 13.342 0 001.903 6.9m2.172-10.275a1.575 1.575 0 00-3.15 0v7.5c0 .712.058 1.412.17 2.1m4.905-9.6V4.575a1.575 1.575 0 00-3.15 0v3m3.15 0v3.375c0 .831.068 1.65.2 2.453" />
+              </svg>
+            </button>
+            <button
+              onClick={handleScreenShare}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-all active:scale-90 ${screenSharingUsers.has(user!.id) ? 'bg-blue-100 text-blue-600' : 'text-neutral-500 hover:text-blue-600 hover:bg-blue-50'}`}
+              title={screenSharingUsers.has(user!.id) ? 'Stop sharing indicator' : 'Share screen indicator'}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
               </svg>
             </button>
           </div>
@@ -440,17 +540,16 @@ export default function SessionRoom() {
             {/* Pages are rendered here by usePdfRenderer */}
           </div>
 
-          {/* Render annotation overlays on each page after PDF loads */}
-          {!pdfLoading && !pdfError && Array.from(pageRefsMap.current.entries()).map(([pageNum, pageEl]) => {
-            return (
-              <div key={pageNum} style={{
+          {/* Render annotation overlays via portals into each page wrapper.
+              This ensures they scroll with the PDF pages and are positioned correctly.
+              pdfReady forces re-render after zoom so dimensions are correct. */}
+          {!pdfLoading && !pdfError && pdfReady > 0 && Array.from(pageRefsMap.current.entries()).map(([pageNum, pageEl]) =>
+            createPortal(
+              <div key={`overlay-${pageNum}-${pdfReady}`} style={{
                 position: 'absolute',
-                left: pageEl.offsetLeft,
-                top: pageEl.offsetTop,
-                width: pageEl.offsetWidth,
-                height: pageEl.offsetHeight,
+                inset: 0,
                 pointerEvents: activeTool ? 'all' : 'none',
-              }} className="transition-all duration-300">
+              }}>
                 <AnnotationLayer
                   pageNumber={pageNum}
                   width={pageEl.offsetWidth}
@@ -467,9 +566,10 @@ export default function SessionRoom() {
                   currentPage={pageNum}
                   currentUserId={user!.id}
                 />
-              </div>
+              </div>,
+              pageEl
             )
-          })}
+          )}
 
           {pdfLoading && (
             <div className="flex flex-col items-center justify-center py-32">
@@ -498,7 +598,64 @@ export default function SessionRoom() {
           typingUsers={typingUsers.filter(u => u.userId !== user!.id)}
           onSend={handleSendMessage}
           onTyping={handleTyping}
+          collapsed={chatCollapsed}
+          onToggle={() => {
+            setChatCollapsed(prev => !prev)
+            if (chatCollapsed) setUnreadCount(0)
+          }}
+          unreadCount={unreadCount}
         />
+      </div>
+
+      {/* Voice chat control bar */}
+      <div className="bg-white/95 backdrop-blur-sm border-t border-neutral-200 px-6 py-2 flex items-center justify-center gap-3 shrink-0 shadow-sm">
+        {voiceActive ? (
+          <>
+            <button
+              onClick={toggleMute}
+              className={`w-9 h-9 flex items-center justify-center rounded-full transition-all active:scale-90 ${voiceMuted ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}
+              title={voiceMuted ? 'Unmute' : 'Mute'}
+            >
+              {voiceMuted ? (
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 19L5 5m7-2a3 3 0 00-3 3v4a3 3 0 005.12 2.12M15 9.34V6a3 3 0 00-5.94-.6M17 14a5 5 0 01-7.54 2.46M12 19v3m-4 0h8" />
+                </svg>
+              ) : (
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                </svg>
+              )}
+            </button>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-50 rounded-full border border-neutral-200">
+              {speakingUsers.size > 0 ? (
+                <span className="text-xs font-medium text-emerald-600">
+                  {Array.from(speakingUsers).map(uid => {
+                    const p = participants.find(p => p.userId === uid)
+                    return uid === user!.id ? 'You' : p?.name?.split(' ')[0] || 'Unknown'
+                  }).join(', ')} speaking
+                </span>
+              ) : (
+                <span className="text-xs text-neutral-400">Voice connected ({peerStates.size} peer{peerStates.size !== 1 ? 's' : ''})</span>
+              )}
+            </div>
+            <button
+              onClick={stopVoice}
+              className="px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-all active:scale-95"
+            >
+              Leave Voice
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={startVoice}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-100 hover:bg-emerald-50 border border-neutral-200 hover:border-emerald-300 text-neutral-600 hover:text-emerald-700 text-xs font-medium transition-all active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+            </svg>
+            Join Voice
+          </button>
+        )}
       </div>
     </div>
   )

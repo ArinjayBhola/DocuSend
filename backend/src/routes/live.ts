@@ -1,8 +1,8 @@
-const express = require('express');
-const { eq, sql, desc, and, gte } = require('drizzle-orm');
-const { db } = require('../config/db');
-const { documents, documentViews, pageEvents, users } = require('../db/schema');
-const { requireAuth } = require('../middleware/auth');
+const express = require("express");
+const { eq, sql, desc, and, gte } = require("drizzle-orm");
+const { db } = require("../config/db");
+const { documents, documentViews, pageEvents, users } = require("../db/schema");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ setInterval(() => {
     if (session.lastActivity < cutoff) {
       activeSessions.delete(viewId);
       broadcastToUser(session.userId, {
-        type: 'session_ended',
+        type: "session_ended",
         viewId,
         viewerEmail: session.viewerEmail,
         documentTitle: session.documentTitle,
@@ -36,21 +36,28 @@ function broadcastToUser(userId, data) {
   if (!clients) return;
   const payload = `data: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) {
-    try { res.write(payload); } catch { /* ignore dead connections */ }
+    try {
+      res.write(payload);
+    } catch {
+      /* ignore dead connections */
+    }
   }
 }
 
 // ============================================================
 // PUBLIC: Called by share viewer to register/update active sessions
 // ============================================================
-router.post('/sessions/start', (req, res) => {
+router.post("/sessions/start", (req, res) => {
   const { viewId, documentId, viewerEmail, totalPages } = req.body;
-  if (!viewId || !documentId) return res.status(400).json({ error: 'Missing viewId or documentId' });
+  if (!viewId || !documentId) return res.status(400).json({ error: "Missing viewId or documentId" });
 
   // Find doc owner
-  const doc = db.select({ userId: documents.userId, title: documents.title })
-    .from(documents).where(eq(documents.id, documentId)).get();
-  if (!doc) return res.status(404).json({ error: 'Document not found' });
+  const doc = db
+    .select({ userId: documents.userId, title: documents.title })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .get();
+  if (!doc) return res.status(404).json({ error: "Document not found" });
 
   const session = {
     viewId,
@@ -58,7 +65,7 @@ router.post('/sessions/start', (req, res) => {
     documentTitle: doc.title,
     userId: doc.userId,
     viewerEmail: viewerEmail || null,
-    viewerIp: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+    viewerIp: req.ip || req.headers["x-forwarded-for"] || "unknown",
     currentPage: 1,
     totalPages: totalPages || 0,
     startedAt: Date.now(),
@@ -71,7 +78,7 @@ router.post('/sessions/start', (req, res) => {
 
   // Broadcast to doc owner
   broadcastToUser(doc.userId, {
-    type: 'session_started',
+    type: "session_started",
     viewId,
     documentId,
     documentTitle: doc.title,
@@ -85,7 +92,7 @@ router.post('/sessions/start', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/sessions/page-change', (req, res) => {
+router.post("/sessions/page-change", (req, res) => {
   const { viewId, pageNumber, timeSpent } = req.body;
   const session = activeSessions.get(viewId);
   if (!session) return res.json({ ok: true });
@@ -96,7 +103,7 @@ router.post('/sessions/page-change', (req, res) => {
   session.timeOnCurrentPage = 0;
 
   broadcastToUser(session.userId, {
-    type: 'page_changed',
+    type: "page_changed",
     viewId,
     documentId: session.documentId,
     documentTitle: session.documentTitle,
@@ -110,16 +117,20 @@ router.post('/sessions/page-change', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/sessions/end', express.text({ type: '*/*' }), (req, res) => {
+router.post("/sessions/end", express.text({ type: "*/*" }), (req, res) => {
   let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch { return res.json({ ok: true }); }
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return res.json({ ok: true });
+    }
   }
   const { viewId } = body;
   const session = activeSessions.get(viewId);
   if (session) {
     broadcastToUser(session.userId, {
-      type: 'session_ended',
+      type: "session_ended",
       viewId,
       documentId: session.documentId,
       documentTitle: session.documentTitle,
@@ -135,12 +146,12 @@ router.post('/sessions/end', express.text({ type: '*/*' }), (req, res) => {
 // ============================================================
 // PROTECTED: SSE endpoint for real-time live feed
 // ============================================================
-router.get('/stream', requireAuth, (req, res) => {
+router.get("/stream", requireAuth, (req, res) => {
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
   });
 
   // Send initial active sessions for this user
@@ -162,7 +173,7 @@ router.get('/stream', requireAuth, (req, res) => {
     }
   }
 
-  res.write(`data: ${JSON.stringify({ type: 'init', sessions: userSessions })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: "init", sessions: userSessions })}\n\n`);
 
   // Register client
   if (!sseClients.has(req.userId)) sseClients.set(req.userId, new Set());
@@ -170,10 +181,14 @@ router.get('/stream', requireAuth, (req, res) => {
 
   // Heartbeat
   const heartbeat = setInterval(() => {
-    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); }
+    try {
+      res.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeat);
+    }
   }, 15000);
 
-  req.on('close', () => {
+  req.on("close", () => {
     clearInterval(heartbeat);
     const clients = sseClients.get(req.userId);
     if (clients) {
@@ -186,28 +201,26 @@ router.get('/stream', requireAuth, (req, res) => {
 // ============================================================
 // PROTECTED: Get engagement scores + document performance
 // ============================================================
-router.get('/engagement', requireAuth, (req, res) => {
+router.get("/engagement", requireAuth, (req, res) => {
   try {
     // Get all views from last 30 days for this user's documents
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const recentViews = db.select({
-      viewId: documentViews.id,
-      documentId: documentViews.documentId,
-      documentTitle: documents.title,
-      viewerEmail: documentViews.viewerEmail,
-      viewerIp: documentViews.viewerIp,
-      duration: documentViews.duration,
-      pagesViewed: documentViews.pagesViewed,
-      totalPages: documentViews.totalPages,
-      viewedAt: documentViews.viewedAt,
-    })
+    const recentViews = db
+      .select({
+        viewId: documentViews.id,
+        documentId: documentViews.documentId,
+        documentTitle: documents.title,
+        viewerEmail: documentViews.viewerEmail,
+        viewerIp: documentViews.viewerIp,
+        duration: documentViews.duration,
+        pagesViewed: documentViews.pagesViewed,
+        totalPages: documentViews.totalPages,
+        viewedAt: documentViews.viewedAt,
+      })
       .from(documentViews)
       .innerJoin(documents, eq(documentViews.documentId, documents.id))
-      .where(and(
-        eq(documents.userId, req.userId),
-        gte(documentViews.viewedAt, thirtyDaysAgo)
-      ))
+      .where(and(eq(documents.userId, req.userId), gte(documentViews.viewedAt, thirtyDaysAgo)))
       .orderBy(desc(documentViews.viewedAt))
       .all();
 
@@ -217,7 +230,7 @@ router.get('/engagement', requireAuth, (req, res) => {
     const viewerScores = {};
 
     for (const view of recentViews) {
-      const key = view.viewerEmail || view.viewerIp || 'unknown';
+      const key = view.viewerEmail || view.viewerIp || "unknown";
       if (!viewerScores[key]) {
         viewerScores[key] = {
           identifier: key,
@@ -230,7 +243,7 @@ router.get('/engagement', requireAuth, (req, res) => {
           lastVisit: view.viewedAt,
           firstVisit: view.viewedAt,
           score: 0,
-          tier: 'cold', // cold, warm, hot
+          tier: "cold", // cold, warm, hot
         };
       }
 
@@ -239,9 +252,7 @@ router.get('/engagement', requireAuth, (req, res) => {
       scorer.totalDuration += Number(view.duration) || 0;
       scorer.documents.add(view.documentId);
 
-      const completion = view.totalPages > 0
-        ? (Number(view.pagesViewed) || 0) / Number(view.totalPages)
-        : 0;
+      const completion = view.totalPages > 0 ? (Number(view.pagesViewed) || 0) / Number(view.totalPages) : 0;
       scorer.maxCompletionRate = Math.max(scorer.maxCompletionRate, completion);
 
       if (view.viewedAt > scorer.lastVisit) scorer.lastVisit = view.viewedAt;
@@ -264,13 +275,12 @@ router.get('/engagement', requireAuth, (req, res) => {
       const recencyScore = Math.max(0, 25 - (daysSinceLastVisit / 30) * 25);
 
       scorer.score = Math.round(timeScore + completionScore + visitScore + recencyScore);
-      scorer.tier = scorer.score >= 70 ? 'hot' : scorer.score >= 40 ? 'warm' : 'cold';
+      scorer.tier = scorer.score >= 70 ? "hot" : scorer.score >= 40 ? "warm" : "cold";
       scorer.documentsCount = scorer.documents.size;
       delete scorer.documents; // Don't send Set to client
     }
 
-    const scoredViewers = Object.values(viewerScores)
-      .sort((a, b) => b.score - a.score);
+    const scoredViewers = Object.values(viewerScores).sort((a, b) => b.score - a.score);
 
     // ---- DOCUMENT PERFORMANCE ----
     const docPerformance = {};
@@ -294,25 +304,27 @@ router.get('/engagement', requireAuth, (req, res) => {
       perf.completionSum += completion;
     }
 
-    const docRankings = Object.values(docPerformance).map(d => ({
-      documentId: d.documentId,
-      title: d.title,
-      totalViews: d.totalViews,
-      uniqueViewers: d.uniqueViewers.size,
-      avgDuration: d.totalViews > 0 ? Math.round(d.totalDuration / d.totalViews) : 0,
-      avgCompletion: d.totalViews > 0 ? Math.round((d.completionSum / d.totalViews) * 100) : 0,
-      engagementScore: Math.round(
-        (d.totalViews * 2) +
-        (d.uniqueViewers.size * 10) +
-        (d.totalDuration / 60) +
-        ((d.completionSum / Math.max(d.totalViews, 1)) * 50)
-      ),
-    })).sort((a, b) => b.engagementScore - a.engagementScore);
+    const docRankings = Object.values(docPerformance)
+      .map((d) => ({
+        documentId: d.documentId,
+        title: d.title,
+        totalViews: d.totalViews,
+        uniqueViewers: d.uniqueViewers.size,
+        avgDuration: d.totalViews > 0 ? Math.round(d.totalDuration / d.totalViews) : 0,
+        avgCompletion: d.totalViews > 0 ? Math.round((d.completionSum / d.totalViews) * 100) : 0,
+        engagementScore: Math.round(
+          d.totalViews * 2 +
+            d.uniqueViewers.size * 10 +
+            d.totalDuration / 60 +
+            (d.completionSum / Math.max(d.totalViews, 1)) * 50,
+        ),
+      }))
+      .sort((a, b) => b.engagementScore - a.engagementScore);
 
     // ---- SUMMARY STATS ----
-    const hotLeads = scoredViewers.filter(v => v.tier === 'hot').length;
-    const warmLeads = scoredViewers.filter(v => v.tier === 'warm').length;
-    const coldLeads = scoredViewers.filter(v => v.tier === 'cold').length;
+    const hotLeads = scoredViewers.filter((v) => v.tier === "hot").length;
+    const warmLeads = scoredViewers.filter((v) => v.tier === "warm").length;
+    const coldLeads = scoredViewers.filter((v) => v.tier === "cold").length;
 
     // Active sessions count for this user
     let activeCount = 0;
@@ -333,8 +345,8 @@ router.get('/engagement', requireAuth, (req, res) => {
       documentRankings: docRankings.slice(0, 20),
     });
   } catch (err) {
-    console.error('[Engagement Error]', err);
-    res.status(500).json({ error: 'Failed to calculate engagement' });
+    console.error("[Engagement Error]", err);
+    res.status(500).json({ error: "Failed to calculate engagement" });
   }
 });
 

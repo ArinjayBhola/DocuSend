@@ -1,27 +1,32 @@
-const express = require('express');
-const { eq, desc, sql } = require('drizzle-orm');
-const { db } = require('../config/db');
-const { documents, documentViews } = require('../db/schema');
-const { requireAuth, loadUser } = require('../middleware/auth');
-const { getPlanLimits } = require('../utils/helpers');
+const express = require("express");
+const { eq, desc, sql } = require("drizzle-orm");
+const { db } = require("../config/db");
+const { documents, documentViews } = require("../db/schema");
+const { requireAuth, loadUser } = require("../middleware/auth");
+const { getPlanLimits } = require("../utils/helpers");
 
 const router = express.Router();
 
-router.get('/', requireAuth, loadUser, (req, res) => {
-  const userDocs = db.select().from(documents)
+router.get("/", requireAuth, loadUser, (req, res) => {
+  const userDocs = db
+    .select()
+    .from(documents)
     .where(eq(documents.userId, req.user.id))
     .orderBy(desc(documents.createdAt))
     .all();
 
-  const docsWithStats = userDocs.map(doc => {
-    const viewStats = db.select({
-      viewCount: sql`count(*)`,
-      totalDuration: sql`coalesce(sum(duration), 0)`,
-    }).from(documentViews)
+  const docsWithStats = userDocs.map((doc) => {
+    const viewStats = db
+      .select({
+        viewCount: sql`count(*)`,
+        totalDuration: sql`coalesce(sum(duration), 0)`,
+      })
+      .from(documentViews)
       .where(eq(documentViews.documentId, doc.id))
       .get();
 
-    const lastView = db.select({ viewedAt: documentViews.viewedAt })
+    const lastView = db
+      .select({ viewedAt: documentViews.viewedAt })
       .from(documentViews)
       .where(eq(documentViews.documentId, doc.id))
       .orderBy(desc(documentViews.viewedAt))

@@ -1,21 +1,21 @@
-const jwt = require('jsonwebtoken');
-const { eq } = require('drizzle-orm');
-const env = require('../config/env');
-const { db } = require('../config/db');
-const { users } = require('../db/schema');
+const jwt = require("jsonwebtoken");
+const { eq } = require("drizzle-orm");
+const env = require("../config/env");
+const { db } = require("../config/db");
+const { users } = require("../db/schema");
 
 function requireAuth(req, res, next) {
   const token = req.cookies?.token;
   if (!token) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: "Authentication required" });
   }
   try {
     const payload = jwt.verify(token, env.JWT_SECRET);
     req.userId = payload.userId;
     next();
   } catch {
-    res.clearCookie('token');
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    res.clearCookie("token");
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 

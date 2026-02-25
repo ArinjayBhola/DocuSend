@@ -1,11 +1,11 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const Database = require("better-sqlite3");
+const path = require("path");
 
-const dbPath = path.join(__dirname, '..', '..', 'docusend.db');
+const dbPath = path.join(__dirname, "..", "..", "docusend.db");
 const db = new Database(dbPath);
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 // Create all tables
 db.exec(`
@@ -216,5 +216,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_annotations_session_id ON annotations(session_id);
 `);
 
-console.log('Database migrated successfully!');
+// Add file_type column to documents (safe to run multiple times)
+try {
+  db.exec(`ALTER TABLE documents ADD COLUMN file_type TEXT NOT NULL DEFAULT 'pdf'`);
+} catch (e) {
+  // Column already exists — ignore
+}
+
+console.log("Database migrated successfully!");
 db.close();
