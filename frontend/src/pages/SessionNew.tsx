@@ -40,7 +40,8 @@ export default function SessionNew() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8">
+    <div className="min-h-screen bg-neutral-50 px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+      <div className="max-w-lg mx-auto">
       <h1 className="text-2xl font-bold text-neutral-900 mb-1">New Session</h1>
       <p className="text-sm text-neutral-500 mb-6">Create a collaborative session to review a document with your team.</p>
 
@@ -110,6 +111,7 @@ export default function SessionNew() {
           </button>
         </div>
       </form>
+      </div>
     </div>
   )
 }

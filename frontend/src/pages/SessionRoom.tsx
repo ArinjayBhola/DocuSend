@@ -35,7 +35,7 @@ export default function SessionRoom() {
   const [strokeWidth, setStrokeWidth] = useState(2)
 
   const eventSourceRef = useRef<EventSource | null>(null)
-  const presenceThrottleRef = useRef<ReturnType<typeof setTimeout>>()
+  const presenceThrottleRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Load session detail
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function SessionRoom() {
 
   // Active session — main room
   return (
-    <div className="h-[calc(100vh-5rem)] flex flex-col">
+    <div className="h-[calc(100vh-5rem)] flex flex-col pt-20">
       {/* Top bar */}
       <div className="bg-white border-b border-neutral-200 px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">

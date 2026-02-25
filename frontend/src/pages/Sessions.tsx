@@ -23,7 +23,8 @@ export default function Sessions() {
   const isFree = user?.plan === 'free'
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-neutral-50 px-4 sm:px-6 lg:px-8 pt-24 pb-10">
+      <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -103,6 +104,7 @@ export default function Sessions() {
       )}
 
       {showJoin && <JoinModal onClose={() => setShowJoin(false)} />}
+      </div>
     </div>
   )
 }
