@@ -22,6 +22,7 @@ import { dashboardRoutes } from './modules/dashboard/index.js';
 import { liveRoutes } from './modules/live/index.js';
 import { notificationsRoutes } from './modules/notifications/index.js';
 import { shareRoutes } from './modules/share/index.js';
+import { engagementRoutes } from './modules/engagement/index.js';
 
 import { errorMiddleware } from './core/middlewares/error.middleware.js';
 
@@ -71,7 +72,8 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/deals', dealsRoutes);
 app.use('/api/sessions', sessionsRoutes);
-app.use('/api/analytics', analyticsRoutes); 
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/engagement', engagementRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);

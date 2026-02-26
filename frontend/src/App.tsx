@@ -24,6 +24,7 @@ import SessionNew from './pages/SessionNew'
 import SessionRoom from './pages/SessionRoom'
 import ShareViewer from './pages/ShareViewer'
 import ShareWorkspace from './pages/ShareWorkspace'
+import Engagement from './pages/Engagement'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/deals/:id" element={<DealDetail />} />
               <Route path="/sessions" element={<Sessions />} />
               <Route path="/sessions/new" element={<SessionNew />} />
+              <Route path="/engagement" element={<Engagement />} />
               <Route path="/live" element={<LiveDashboard />} />
               <Route path="/notifications/settings" element={<NotificationSettings />} />
             </Route>

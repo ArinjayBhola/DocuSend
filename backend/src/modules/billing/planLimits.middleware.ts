@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, isNotNull } from 'drizzle-orm';
 import { db } from '../../config/db.js';
-import { documents, deals, sessions } from '../../db/schema.js';
+import { documents, documentViews, deals, sessions } from '../../db/schema.js';
 import { getPlanLimits } from './plan.constants.js';
 import { ForbiddenError } from '../../core/errors/AppError.js';
 
@@ -68,6 +68,15 @@ export const checkSessionLimit = async (req: Request, res: Response, next: NextF
 
   if (result.count >= limits.sessions) {
     throw new ForbiddenError(`You've reached the ${limits.sessions} active session limit on the ${req.user.plan} plan. End existing sessions or upgrade.`);
+  }
+  next();
+};
+
+export const checkEngagementAccess = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) return next();
+  const limits = getPlanLimits(req.user.plan);
+  if (limits.engagementViewers === 0) {
+    throw new ForbiddenError('Engagement Scoring is not available on the free plan. Upgrade to Pro or Business.');
   }
   next();
 };

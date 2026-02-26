@@ -12,6 +12,7 @@ export interface PlanLimits {
   teamSeats: number;
   deals: number;
   sessions: number;
+  engagementViewers: number;
 }
 
 export interface RazorpayCustomerResponse {
