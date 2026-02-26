@@ -23,6 +23,7 @@ import { liveRoutes } from './modules/live/index.js';
 import { notificationsRoutes } from './modules/notifications/index.js';
 import { shareRoutes } from './modules/share/index.js';
 import { engagementRoutes } from './modules/engagement/index.js';
+import { smartLinksRoutes } from './modules/smartlinks/index.js';
 
 import { errorMiddleware } from './core/middlewares/error.middleware.js';
 
@@ -74,6 +75,7 @@ app.use('/api/deals', dealsRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/engagement', engagementRoutes);
+app.use('/api/smartlinks', smartLinksRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);

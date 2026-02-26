@@ -1,25 +1,33 @@
 import { ShareRepository } from './share.repository.js';
 import { DocumentsRepository } from '../documents/index.js';
 import { NotificationsService } from '../notifications/index.js';
-import { UsersRepository } from '../auth/index.js';
+import { AuthRepository } from '../auth/index.js';
+import { SmartLinksService } from '../smartlinks/index.js';
 import { PublicDocMetadata, ViewStartInput, PageEventInput } from './share.types.js';
-import { NotFoundError, UnauthorizedError } from '../../core/errors/AppError.js';
+import { NotFoundError, UnauthorizedError, BadRequestError } from '../../core/errors/AppError.js';
 import { sendViewNotification } from '../../services/email.js';
 
 export class ShareService {
   private repository: ShareRepository;
   private documentsRepository: DocumentsRepository;
   private notificationsService: NotificationsService;
-  private usersRepository: UsersRepository;
+  private usersRepository: AuthRepository;
+  private smartLinksService: SmartLinksService;
 
   constructor() {
     this.repository = new ShareRepository();
     this.documentsRepository = new DocumentsRepository();
     this.notificationsService = new NotificationsService();
-    this.usersRepository = new UsersRepository();
+    this.usersRepository = new AuthRepository();
+    this.smartLinksService = new SmartLinksService();
   }
 
   async getMetadata(slug: string): Promise<PublicDocMetadata> {
+    // Check if this is a smart link slug (prefixed with sl_)
+    if (slug.startsWith('sl_')) {
+      return this.getSmartLinkMetadata(slug);
+    }
+
     const doc = await this.repository.findBySlug(slug);
     if (!doc || !doc.isActive) throw new NotFoundError('Document not found');
 
@@ -38,7 +46,37 @@ export class ShareService {
     };
   }
 
+  private async getSmartLinkMetadata(slug: string): Promise<PublicDocMetadata> {
+    const result = await this.smartLinksService.resolveSmartLink(slug);
+    if (!result) throw new NotFoundError('Document not found');
+
+    const { link, document: doc } = result;
+
+    return {
+      id: doc.id,
+      title: doc.title,
+      fileName: doc.fileName,
+      shareSlug: slug,
+      allowDownload: link.allowDownload,
+      requiresPassword: link.requirePassword,
+      requiresEmail: false, // Smart links already know the recipient
+      smartLinkId: link.id,
+      recipientEmail: link.recipientEmail,
+      recipientName: link.recipientName || undefined,
+    };
+  }
+
   async verifyPassword(slug: string, password?: string) {
+    // Handle smart link password verification
+    if (slug.startsWith('sl_')) {
+      const { SmartLinksRepository } = await import('../smartlinks/index.js');
+      const repo = new SmartLinksRepository();
+      const link = await repo.findBySlug(slug);
+      if (!link) throw new NotFoundError('Not found');
+      if (password === link.password) return true;
+      throw new UnauthorizedError('Incorrect password');
+    }
+
     const doc = await this.repository.findBySlug(slug);
     if (!doc) throw new NotFoundError('Not found');
 
@@ -67,11 +105,17 @@ export class ShareService {
     const view = await this.repository.createView({
       documentId: input.documentId,
       viewerEmail: input.viewerEmail || null,
+      smartLinkId: input.smartLinkId || null,
       viewerIp: ip,
       userAgent,
       totalPages: input.totalPages || 0,
       referrer,
     });
+
+    // Increment smart link view count on actual view start (not on metadata fetch)
+    if (input.smartLinkId) {
+      this.smartLinksService.recordView(input.smartLinkId).catch(() => {});
+    }
 
     // Notify owner
     this.notifyOwner(doc, input.viewerEmail || null, ip);
@@ -116,10 +160,3 @@ export class ShareService {
   }
 }
 
-// Internal error class for simple BadRequest
-class BadRequestError extends Error {
-    constructor(msg: string) {
-        super(msg);
-        this.name = 'BadRequestError';
-    }
-}

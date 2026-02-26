@@ -1,4 +1,4 @@
-import { Router, express } from 'express';
+import { Router } from 'express';
 import { LiveController } from './live.controller.js';
 import { asyncHandler } from '../../core/utils/asyncHandler.js';
 import { requireAuth } from '../auth/index.js';

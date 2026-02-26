@@ -227,5 +227,38 @@ try {
   // Column already exists — ignore
 }
 
+// Smart Links table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS smart_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    slug TEXT NOT NULL UNIQUE,
+    recipient_email TEXT NOT NULL,
+    recipient_name TEXT,
+    allow_download INTEGER NOT NULL DEFAULT 0,
+    require_password INTEGER NOT NULL DEFAULT 0,
+    password TEXT,
+    expires_at TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    max_views INTEGER,
+    view_count INTEGER NOT NULL DEFAULT 0,
+    last_viewed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_smart_links_user_id ON smart_links(user_id);
+  CREATE INDEX IF NOT EXISTS idx_smart_links_document_id ON smart_links(document_id);
+  CREATE INDEX IF NOT EXISTS idx_smart_links_slug ON smart_links(slug);
+  CREATE INDEX IF NOT EXISTS idx_smart_links_recipient_email ON smart_links(recipient_email);
+`);
+
+// Add smart_link_id column to document_views
+try {
+  db.exec(`ALTER TABLE document_views ADD COLUMN smart_link_id INTEGER REFERENCES smart_links(id) ON DELETE SET NULL`);
+} catch (e) {
+  // Column already exists — ignore
+}
+
 console.log('Database migrated successfully!');
 db.close();

@@ -1,4 +1,4 @@
-import { Router, express } from 'express';
+import { Router } from 'express';
 import { ShareController } from './share.controller.js';
 import { asyncHandler } from '../../core/utils/asyncHandler.js';
 

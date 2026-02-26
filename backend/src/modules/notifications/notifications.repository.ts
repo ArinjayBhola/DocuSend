@@ -1,7 +1,7 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { db } from '../../config/db.js';
-import { notifications, notificationPreferences } from '../../db/schema.js';
-import { Notification, NewNotification, NotificationPreference } from './notifications.types.js';
+import { eq, and, desc, sql } from "drizzle-orm";
+import { db } from "../../config/db.js";
+import { notifications, notificationPreferences } from "../../db/schema.js";
+import { NewNotification, NotificationPreference } from "./notifications.types.js";
 
 export class NotificationsRepository {
   async findAllByUser(userId: number, limit: number = 50) {

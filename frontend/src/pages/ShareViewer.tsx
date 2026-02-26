@@ -15,7 +15,13 @@ export default function ShareViewer() {
 
   useEffect(() => {
     getShareDoc(slug)
-      .then(data => setDoc(data.document))
+      .then(data => {
+        setDoc(data.document)
+        // Smart links auto-populate the viewer email
+        if (data.document.recipientEmail) {
+          setViewerEmail(data.document.recipientEmail)
+        }
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [slug])

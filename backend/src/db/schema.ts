@@ -34,11 +34,36 @@ export const documents = sqliteTable('documents', {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const smartLinks = sqliteTable('smart_links', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  documentId: integer('document_id')
+    .notNull()
+    .references(() => documents.id, { onDelete: 'cascade' }),
+  slug: text('slug').notNull().unique(),
+  recipientEmail: text('recipient_email').notNull(),
+  recipientName: text('recipient_name'),
+  allowDownload: integer('allow_download', { mode: 'boolean' }).notNull().default(false),
+  requirePassword: integer('require_password', { mode: 'boolean' }).notNull().default(false),
+  password: text('password'),
+  expiresAt: text('expires_at'),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  maxViews: integer('max_views'),
+  viewCount: integer('view_count').notNull().default(0),
+  lastViewedAt: text('last_viewed_at'),
+  createdAt: text('created_at')
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const documentViews = sqliteTable('document_views', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   documentId: integer('document_id')
     .notNull()
     .references(() => documents.id, { onDelete: 'cascade' }),
+  smartLinkId: integer('smart_link_id').references(() => smartLinks.id, { onDelete: 'set null' }),
   viewerEmail: text('viewer_email'),
   viewerIp: text('viewer_ip'),
   userAgent: text('user_agent'),

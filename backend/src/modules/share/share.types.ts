@@ -6,11 +6,15 @@ export interface PublicDocMetadata {
   allowDownload: boolean;
   requiresPassword: boolean;
   requiresEmail: boolean;
+  smartLinkId?: number;
+  recipientEmail?: string;
+  recipientName?: string;
 }
 
 export interface ViewStartInput {
   documentId: number;
   viewerEmail?: string | null;
+  smartLinkId?: number | null;
   totalPages: number;
 }
 

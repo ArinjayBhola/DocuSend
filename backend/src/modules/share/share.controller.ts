@@ -3,16 +3,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ShareService } from './share.service.js';
 import { DocumentsRepository } from '../documents/index.js';
+import { SmartLinksRepository } from '../smartlinks/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ShareController {
   private service: ShareService;
   private documentsRepository: DocumentsRepository;
+  private smartLinksRepository: SmartLinksRepository;
 
   constructor() {
     this.service = new ShareService();
     this.documentsRepository = new DocumentsRepository();
+    this.smartLinksRepository = new SmartLinksRepository();
   }
 
   getMetadata = async (req: Request, res: Response) => {
@@ -56,7 +59,20 @@ export class ShareController {
   };
 
   serveFile = async (req: Request, res: Response) => {
-    const doc = await this.documentsRepository.findBySlug(req.params.slug as string);
+    const slug = req.params.slug as string;
+    let doc;
+
+    // Handle smart link slugs
+    if (slug.startsWith('sl_')) {
+      const link = await this.smartLinksRepository.findBySlug(slug);
+      if (!link || !link.isActive) return res.status(404).json({ error: 'Not found' });
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) return res.status(400).json({ error: 'This link has expired' });
+      if (link.maxViews && link.viewCount >= link.maxViews) return res.status(400).json({ error: 'This link has reached its view limit' });
+      doc = await this.documentsRepository.findById(link.documentId);
+    } else {
+      doc = await this.documentsRepository.findBySlug(slug);
+    }
+
     if (!doc || !doc.isActive) return res.status(404).json({ error: 'Not found' });
 
     // Path resolution needs to be careful from ESM /src/modules/share

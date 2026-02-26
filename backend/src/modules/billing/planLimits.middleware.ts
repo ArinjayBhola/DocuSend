@@ -80,3 +80,12 @@ export const checkEngagementAccess = async (req: Request, res: Response, next: N
   }
   next();
 };
+
+export const checkSmartLinksAccess = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) return next();
+  const limits = getPlanLimits(req.user.plan);
+  if (limits.smartLinks === 0) {
+    throw new ForbiddenError('Smart Links are not available on the free plan. Upgrade to Pro or Business.');
+  }
+  next();
+};

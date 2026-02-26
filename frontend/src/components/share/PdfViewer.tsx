@@ -21,6 +21,7 @@ export default function PdfViewer({ document, viewerEmail }) {
         const { viewId } = await startView({
           documentId: document.id,
           viewerEmail: viewerEmail || null,
+          smartLinkId: document.smartLinkId || null,
           totalPages: numPages,
         })
         if (cancelled) return

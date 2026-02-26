@@ -13,6 +13,7 @@ export interface PlanLimits {
   deals: number;
   sessions: number;
   engagementViewers: number;
+  smartLinks: number;
 }
 
 export interface RazorpayCustomerResponse {
