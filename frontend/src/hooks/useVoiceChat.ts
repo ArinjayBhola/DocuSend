@@ -17,12 +17,15 @@ export default function useVoiceChat(
   participants: Participant[],
   onSignalEvent?: (handler: (data: any) => void) => void
 ) {
-  const [isActive, setIsActive] = useState(false)
+  const [isActive, setIsActive] = useState(false) // Whether we are in the RTC mesh
   const [isMuted, setIsMuted] = useState(false)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set())
   const [peerStates, setPeerStates] = useState<Map<number, string>>(new Map())
+  const [remoteStreams, setRemoteStreams] = useState<Map<number, MediaStream>>(new Map())
 
   const localStreamRef = useRef<MediaStream | null>(null)
+  const screenStreamRef = useRef<MediaStream | null>(null)
   const peersRef = useRef<Map<number, RTCPeerConnection>>(new Map())
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -48,14 +51,45 @@ export default function useVoiceChat(
         pc.addTrack(track, localStreamRef.current!)
       })
     }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, screenStreamRef.current!)
+      })
+    }
 
-    // Handle remote audio
+    // Handle remote tracks
     pc.ontrack = (event) => {
-      const audio = new Audio()
-      audio.srcObject = event.streams[0]
-      audio.autoplay = true
-      // Attach to DOM briefly to enable autoplay
-      audio.play().catch(() => {})
+      setRemoteStreams(prev => {
+        const next = new Map(prev)
+        const currentStream = next.get(remoteUserId) || new MediaStream()
+        
+        // Ensure new tracks are added to a NEW MediaStream object so React detects the change
+        const newStream = new MediaStream(currentStream.getTracks())
+        
+        if (event.streams && event.streams[0]) {
+          event.streams[0].getTracks().forEach(track => {
+            if (!newStream.getTracks().find(t => t.id === track.id)) {
+              newStream.addTrack(track)
+            }
+          })
+        } else {
+          // Fallback for track-only events
+          if (!newStream.getTracks().find(t => t.id === event.track.id)) {
+            newStream.addTrack(event.track)
+          }
+        }
+        
+        // Handle legacy audio-only path for background playback
+        if (event.track.kind === 'audio') {
+          const audio = new Audio()
+          audio.srcObject = new MediaStream([event.track])
+          audio.autoplay = true
+          audio.play().catch(() => {})
+        }
+
+        next.set(remoteUserId, newStream)
+        return next
+      })
     }
 
     pc.onicecandidate = (event) => {
@@ -94,8 +128,16 @@ export default function useVoiceChat(
   }, [sessionId])
 
   const handleSignal = useCallback(async (data: any) => {
-    if (!isActiveRef.current) return
     const { fromUserId, signalType, payload } = data
+
+    // If we're not active, we might need to become active to handle incoming signals properly
+    // but typically we wait for manual join. 
+    // HOWEVER, if someone is sending us an offer, we should probably handle it if we want to SEE them.
+    if (!isActiveRef.current && signalType !== 'voice-state' && signalType !== 'screen-state') {
+       // Auto-establish connection if we receive a relevant signal and want to be part of the room
+       // But for DocuSend, we wait for a manual trigger for simplicity to avoid unwanted data use.
+       return 
+    }
 
     if (signalType === 'offer') {
       const pc = createPeerConnection(fromUserId, false)
@@ -119,7 +161,6 @@ export default function useVoiceChat(
       }
     } else if (signalType === 'voice-state') {
       if (payload.active === false) {
-        // Remote user stopped voice — close their peer connection
         const pc = peersRef.current.get(fromUserId)
         if (pc) {
           pc.close()
@@ -128,6 +169,11 @@ export default function useVoiceChat(
             const next = new Map(prev)
             next.delete(fromUserId)
             return next
+          })
+          setRemoteStreams(prev => {
+             const next = new Map(prev)
+             next.delete(fromUserId)
+             return next
           })
         }
       }
@@ -138,8 +184,39 @@ export default function useVoiceChat(
         else next.delete(fromUserId)
         return next
       })
+    } else if (signalType === 'renegotiate') {
+       const pc = peersRef.current.get(fromUserId)
+       if (pc) {
+          pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .then(() => {
+              sendSignal(sessionId, {
+                targetUserId: fromUserId,
+                type: 'offer',
+                payload: pc.localDescription,
+              }).catch(() => {})
+            })
+       }
     }
   }, [sessionId, createPeerConnection])
+
+  // Establish peer connections with all participants
+  const joinMesh = useCallback(() => {
+    if (isActiveRef.current) return
+    setIsActive(true)
+    isActiveRef.current = true
+
+    for (const p of participants) {
+      if (p.userId !== userId) {
+        createPeerConnection(p.userId, true)
+        sendSignal(sessionId, {
+          targetUserId: p.userId,
+          type: 'voice-state',
+          payload: { active: true },
+        }).catch(() => {})
+      }
+    }
+  }, [participants, userId, sessionId, createPeerConnection])
 
   // Store handler ref for external use
   useEffect(() => {
@@ -199,30 +276,16 @@ export default function useVoiceChat(
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       localStreamRef.current = stream
-      setIsActive(true)
-      isActiveRef.current = true
-
-      // Connect to all existing participants
-      for (const p of participants) {
-        if (p.userId !== userId) {
-          createPeerConnection(p.userId, true)
-          // Notify them we're joining voice
-          sendSignal(sessionId, {
-            targetUserId: p.userId,
-            type: 'voice-state',
-            payload: { active: true },
-          }).catch(() => {})
-        }
-      }
-
+      
+      joinMesh()
       startSpeakingDetection()
     } catch (err) {
       console.error('Failed to start voice:', err)
     }
-  }, [participants, userId, sessionId, createPeerConnection, startSpeakingDetection])
+  }, [joinMesh, startSpeakingDetection])
 
   const stopVoice = useCallback(() => {
-    // Notify peers
+    // Notify peers and cleanup
     for (const [remoteId, pc] of peersRef.current) {
       sendSignal(sessionId, {
         targetUserId: remoteId,
@@ -233,14 +296,13 @@ export default function useVoiceChat(
     }
     peersRef.current.clear()
     setPeerStates(new Map())
+    setRemoteStreams(new Map())
 
-    // Stop local stream
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => t.stop())
       localStreamRef.current = null
     }
 
-    // Stop speaking detection
     if (speakingIntervalRef.current) {
       clearInterval(speakingIntervalRef.current)
       speakingIntervalRef.current = null
@@ -253,6 +315,51 @@ export default function useVoiceChat(
     setSpeakingUsers(new Set())
     setIsActive(false)
     setIsMuted(false)
+  }, [sessionId])
+
+  const startScreenShare = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      screenStreamRef.current = stream
+      setIsScreenSharing(true)
+
+      // Establish mesh if not already active
+      joinMesh()
+
+      // Add tracks to all peers
+      for (const [remoteId, pc] of peersRef.current) {
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream)
+        })
+        sendSignal(sessionId, {
+            targetUserId: remoteId,
+            type: 'renegotiate',
+            payload: {}
+        }).catch(() => {})
+      }
+
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare()
+      }
+    } catch (err) {
+      console.error('Failed to start screen share:', err)
+    }
+  }, [sessionId, joinMesh])
+
+  const stopScreenShare = useCallback(() => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop())
+      screenStreamRef.current = null
+      setIsScreenSharing(false)
+      
+      for (const [remoteId] of peersRef.current) {
+          sendSignal(sessionId, {
+              targetUserId: remoteId,
+              type: 'renegotiate',
+              payload: {}
+          }).catch(() => {})
+      }
+    }
   }, [sessionId])
 
   const toggleMute = useCallback(() => {
@@ -269,11 +376,13 @@ export default function useVoiceChat(
   useEffect(() => {
     return () => {
       if (isActiveRef.current) {
-        // Stop everything
         for (const [, pc] of peersRef.current) pc.close()
         peersRef.current.clear()
         if (localStreamRef.current) {
           localStreamRef.current.getTracks().forEach(t => t.stop())
+        }
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(t => t.stop())
         }
         if (speakingIntervalRef.current) clearInterval(speakingIntervalRef.current)
         if (audioContextRef.current) audioContextRef.current.close().catch(() => {})
@@ -284,10 +393,15 @@ export default function useVoiceChat(
   return {
     isActive,
     isMuted,
+    isScreenSharing,
     toggleMute,
     startVoice,
     stopVoice,
+    startScreenShare,
+    stopScreenShare,
     speakingUsers,
     peerStates,
+    remoteStreams,
+    joinMesh,
   }
 }

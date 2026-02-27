@@ -11,9 +11,11 @@ interface Props {
   cursors: RemoteCursor[]
   currentPage: number
   currentUserId: number
+  width: number
+  height: number
 }
 
-export default function CursorOverlay({ cursors, currentPage, currentUserId }: Props) {
+export default function CursorOverlay({ cursors, currentPage, currentUserId, width, height }: Props) {
   const visibleCursors = cursors.filter(
     c => c.userId !== currentUserId && c.currentPage === currentPage && (c.cursorX > 0 || c.cursorY > 0)
   )
@@ -26,7 +28,11 @@ export default function CursorOverlay({ cursors, currentPage, currentUserId }: P
         <div
           key={c.userId}
           className="absolute transition-all duration-300 ease-out"
-          style={{ left: c.cursorX, top: c.cursorY, transitionProperty: 'left, top' }}
+          style={{ 
+            left: c.cursorX * width, 
+            top: c.cursorY * height, 
+            transitionProperty: 'left, top' 
+          }}
         >
           {/* Cursor arrow */}
           <svg width="18" height="22" viewBox="0 0 16 20" fill="none" className="-ml-1 select-none drop-shadow-sm">

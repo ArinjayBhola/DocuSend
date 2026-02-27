@@ -4,7 +4,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
-export default function usePdfRenderer(pdfUrl: string, scale: number = 1.5) {
+export default function usePdfRenderer(pdfUrl: string, scale: number = 1.0) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pageRefsMap = useRef<Map<number, HTMLDivElement>>(new Map())
   const [numPages, setNumPages] = useState(0)

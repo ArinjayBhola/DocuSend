@@ -85,12 +85,15 @@ export default function AnnotationLayer({
     }
 
     if (activeTool === 'pen' && points.length > 2) {
+      // Normalize points
+      const normalizedPoints = points.map(p => ({ x: p.x / width, y: p.y / height }))
+      
       const pendingId = Date.now()
       const newAnnotation = {
         id: pendingId,
         pageNumber,
         type: 'pen',
-        data: { points, strokeWidth },
+        data: { points: normalizedPoints, strokeWidth },
         color: activeColor,
         isPending: true
       }
@@ -98,15 +101,15 @@ export default function AnnotationLayer({
       onAnnotationCreate({
         pageNumber,
         type: 'pen',
-        data: { points, strokeWidth },
+        data: { points: normalizedPoints, strokeWidth },
         color: activeColor,
       })
     } else if (activeTool === 'highlight') {
-      const x = Math.min(startPos.x, currentPos.x)
-      const y = Math.min(startPos.y, currentPos.y)
-      const w = Math.abs(currentPos.x - startPos.x)
-      const h = Math.abs(currentPos.y - startPos.y)
-      if (w > 5 && h > 5) {
+      const x = Math.min(startPos.x, currentPos.x) / width
+      const y = Math.min(startPos.y, currentPos.y) / height
+      const w = Math.abs(currentPos.x - startPos.x) / width
+      const h = Math.abs(currentPos.y - startPos.y) / height
+      if (w > 0.005 && h > 0.005) {
         onAnnotationCreate({
           pageNumber,
           type: 'highlight',
@@ -115,11 +118,11 @@ export default function AnnotationLayer({
         })
       }
     } else if (activeTool === 'shape') {
-      const x = Math.min(startPos.x, currentPos.x)
-      const y = Math.min(startPos.y, currentPos.y)
-      const w = Math.abs(currentPos.x - startPos.x)
-      const h = Math.abs(currentPos.y - startPos.y)
-      if (w > 5 && h > 5) {
+      const x = Math.min(startPos.x, currentPos.x) / width
+      const y = Math.min(startPos.y, currentPos.y) / height
+      const w = Math.abs(currentPos.x - startPos.x) / width
+      const h = Math.abs(currentPos.y - startPos.y) / height
+      if (w > 0.005 && h > 0.005) {
         onAnnotationCreate({
           pageNumber,
           type: 'shape',
@@ -140,7 +143,7 @@ export default function AnnotationLayer({
     onAnnotationCreate({
       pageNumber,
       type: 'comment',
-      data: { x: commentPos.x, y: commentPos.y, text: commentText.trim() },
+      data: { x: commentPos.x / width, y: commentPos.y / height, text: commentText.trim() },
       color: activeColor,
     })
     setCommentPos(null)
@@ -152,7 +155,7 @@ export default function AnnotationLayer({
     onAnnotationCreate({
       pageNumber,
       type: 'text',
-      data: { x: textInput.x, y: textInput.y, text: textValue.trim(), fontSize: 16 },
+      data: { x: textInput.x / width, y: textInput.y / height, text: textValue.trim(), fontSize: 16 },
       color: activeColor,
     })
     setTextInput(null)
@@ -211,14 +214,14 @@ export default function AnnotationLayer({
             return (
               <g key={a.id} {...commonProps}>
                 {a.data.rects?.map((r: any, i: number) => (
-                  <rect key={`${a.id}-${i}`} x={r.x} y={r.y} width={r.width} height={r.height}
+                  <rect key={`${a.id}-${i}`} x={r.x * width} y={r.y * height} width={r.width * width} height={r.height * height}
                     fill={a.color} fillOpacity={0.25} stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 1.5 : 1} strokeOpacity={isEraser ? 0.8 : 0.5} />
                 ))}
               </g>
             )
           }
           if (a.type === 'pen') {
-            const pts = a.data.points?.map((p: any) => `${p.x},${p.y}`).join(' ')
+            const pts = a.data.points?.map((p: any) => `${p.x * width},${p.y * height}`).join(' ')
             return (
               <g key={a.id} {...commonProps}>
                 {/* Wider invisible stroke for easier hit detection */}
@@ -236,13 +239,14 @@ export default function AnnotationLayer({
             const d = a.data
             let shape = null
             if (d.shapeType === 'rect') {
-              shape = <rect x={d.x} y={d.y} width={d.width} height={d.height}
+              shape = <rect x={d.x * width} y={d.y * height} width={d.width * width} height={d.height * height}
                 fill="none" stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} />
             } else if (d.shapeType === 'ellipse') {
-              shape = <ellipse cx={d.x + d.width / 2} cy={d.y + d.height / 2}
-                rx={d.width / 2} ry={d.height / 2} fill="none" stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} />
+              shape = <ellipse cx={(d.x + d.width / 2) * width} cy={(d.y + d.height / 2) * height}
+                rx={d.width / 2 * width} ry={d.height / 2 * height} fill="none" stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} />
             } else if (d.shapeType === 'arrow') {
-              shape = <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+              // Arrow might need normalized x1, y1, x2, y2 if implemented in future
+              shape = <line x1={d.x1 * width} y1={d.y1 * height} x2={d.x2 * width} y2={d.y2 * height}
                 stroke={isEraser ? '#EF4444' : a.color} strokeWidth={isEraser ? 3 : 2} markerEnd={isEraser ? "" : "url(#arrowhead)"} />
             }
             return <g key={a.id} {...commonProps}>{shape}</g>
@@ -250,8 +254,8 @@ export default function AnnotationLayer({
           if (a.type === 'comment') {
             return (
               <g key={a.id} {...commonProps}>
-                <circle cx={a.data.x} cy={a.data.y} r={12} fill={isEraser ? '#EF4444' : a.color} fillOpacity={0.9} className="animate-in fade-in zoom-in duration-300" />
-                <text x={a.data.x} y={a.data.y + 4} textAnchor="middle" fill="white" fontSize={10} fontWeight="bold" style={{ pointerEvents: 'none' }} className="animate-in fade-in zoom-in duration-300 delay-100">
+                <circle cx={a.data.x * width} cy={a.data.y * height} r={12} fill={isEraser ? '#EF4444' : a.color} fillOpacity={0.9} className="animate-in fade-in zoom-in duration-300" />
+                <text x={a.data.x * width} y={a.data.y * height + 4} textAnchor="middle" fill="white" fontSize={10} fontWeight="bold" style={{ pointerEvents: 'none' }} className="animate-in fade-in zoom-in duration-300 delay-100">
                   {isEraser ? '×' : '?'}
                 </text>
                 <title>{a.data.text} — {a.userName}</title>
@@ -260,7 +264,7 @@ export default function AnnotationLayer({
           }
           if (a.type === 'text') {
             return (
-              <foreignObject key={a.id} x={a.data.x} y={a.data.y} width={250} height={100} {...commonProps} className={`animate-in slide-in-from-top-1 duration-300 ${commonProps.className}`}>
+              <foreignObject key={a.id} x={a.data.x * width} y={a.data.y * height} width={250} height={100} {...commonProps} className={`animate-in slide-in-from-top-1 duration-300 ${commonProps.className}`}>
                 <div style={{ color: isEraser ? '#EF4444' : a.color, fontSize: a.data.fontSize || 16, fontWeight: 500, lineHeight: 1.2, textDecoration: isEraser ? 'line-through' : 'none' }}>
                   {a.data.text}
                 </div>

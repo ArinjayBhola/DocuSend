@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import useFileRenderer from '../hooks/useFileRenderer'
+import MediaStreamView from '../components/sessions/MediaStreamView'
 import useVoiceChat from '../hooks/useVoiceChat'
 import {
   getSession, startSession, endSession, leaveSession,
@@ -45,7 +46,7 @@ export default function SessionRoom() {
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [activeColor, setActiveColor] = useState('#3B82F6')
   const [strokeWidth, setStrokeWidth] = useState(2)
-  const [scale, setScale] = useState(1.5)
+  const [scale, setScale] = useState(1.0)
   const [pdfReady, setPdfReady] = useState(0) // increments to force overlay re-render after PDF load
 
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -59,12 +60,56 @@ export default function SessionRoom() {
   const voiceSignalHandlerRef = useRef<((data: any) => void) | null>(null)
 
   // Voice chat
-  const { isActive: voiceActive, isMuted: voiceMuted, toggleMute, startVoice, stopVoice, speakingUsers, peerStates } = useVoiceChat(
+  const { 
+    isActive: voiceActive, 
+    isMuted: voiceMuted, 
+    isScreenSharing,
+    toggleMute, 
+    startVoice, 
+    stopVoice, 
+    startScreenShare,
+    stopScreenShare,
+    speakingUsers, 
+    peerStates,
+    remoteStreams,
+    joinMesh
+  } = useVoiceChat(
     sessionId,
     user?.id || 0,
     participants,
     (handler) => { voiceSignalHandlerRef.current = handler }
   )
+
+  // Auto-join RTC mesh if someone starts sharing screen
+  useEffect(() => {
+    if (screenSharingUsers.size > 0 && !voiceActive) {
+      joinMesh()
+    }
+  }, [screenSharingUsers.size, voiceActive, joinMesh])
+
+  // Hand raise audio chime
+  const playHandRaiseSound = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = audioCtx.createOscillator()
+      const gainNode = audioCtx.createGain()
+
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime) // A5
+      oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5) // A4
+
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioCtx.destination)
+
+      oscillator.start()
+      oscillator.stop(audioCtx.currentTime + 0.5)
+    } catch (e) {
+      console.warn('Audio context failed to start', e)
+    }
+  }, [])
 
   // Track which users are muted (for UI display) — only local user for now
   const mutedUsers = voiceMuted ? new Set([user!.id]) : new Set<number>()
@@ -238,6 +283,7 @@ export default function SessionRoom() {
     let activePage = currentPageRef.current
     let relativeX = 0
     let relativeY = 0
+    let activeRect: DOMRect | null = null
 
     for (const [pageNum, pageEl] of pages) {
       const rect = pageEl.getBoundingClientRect()
@@ -246,6 +292,7 @@ export default function SessionRoom() {
         activePage = pageNum
         relativeX = e.clientX - rect.left
         relativeY = e.clientY - rect.top
+        activeRect = rect
         break
       }
     }
@@ -254,11 +301,13 @@ export default function SessionRoom() {
       presenceThrottleRef.current = undefined
     }, 200)
 
-    updatePresence(sessionId, {
-      currentPage: activePage,
-      cursorX: relativeX,
-      cursorY: relativeY
-    }).catch(() => {})
+    if (activeRect) {
+      updatePresence(sessionId, {
+        currentPage: activePage,
+        cursorX: relativeX / activeRect.width,
+        cursorY: relativeY / activeRect.height
+      }).catch(() => {})
+    }
   }, [connected, sessionId])
 
   const handleCopyCode = useCallback(() => {
@@ -299,13 +348,30 @@ export default function SessionRoom() {
     sendTyping(sessionId, isTyping).catch(() => {})
   }, [sessionId])
 
-  const handleHandRaise = useCallback(() => {
-    toggleHandRaise(sessionId).catch(() => {})
-  }, [sessionId])
+  const handleHandRaise = useCallback(async () => {
+    try {
+      const { raised } = await toggleHandRaise(sessionId)
+      if (raised) {
+        playHandRaiseSound()
+      }
+    } catch (err) {
+      console.error('Hand raise toggle failed', err)
+    }
+  }, [sessionId, playHandRaiseSound])
 
-  const handleScreenShare = useCallback(() => {
-    toggleScreenShare(sessionId).catch(() => {})
-  }, [sessionId])
+  const handleScreenShare = useCallback(async () => {
+    try {
+      if (!isScreenSharing) {
+        await startScreenShare()
+        await toggleScreenShare(sessionId)
+      } else {
+        stopScreenShare()
+        await toggleScreenShare(sessionId)
+      }
+    } catch (err) {
+      console.error('Screen share toggle failed', err)
+    }
+  }, [sessionId, isScreenSharing, startScreenShare, stopScreenShare])
 
   const handleStart = async () => {
     try {
@@ -540,6 +606,44 @@ export default function SessionRoom() {
             {/* Pages are rendered here by usePdfRenderer */}
           </div>
 
+          {/* Remote Screen Share Overlay */}
+          {Array.from(remoteStreams.entries()).map(([uId, stream]) => {
+            const sharer = participants.find(p => p.userId === uId)
+            if (!screenSharingUsers.has(uId) || !sharer) return null
+            return (
+              <div key={uId} className="fixed inset-0 z-[100] p-4 bg-neutral-900/95 backdrop-blur-md flex flex-col animate-in fade-in duration-300">
+                <div className="flex-1 min-h-0 w-full max-w-7xl mx-auto flex items-center justify-center">
+                  <MediaStreamView stream={stream} userName={sharer.name} />
+                </div>
+                {/* Visual indicator that someone is sharing */}
+                <div className="shrink-0 py-4 text-center">
+                  <p className="text-neutral-400 text-sm font-medium">
+                    You are viewing <span className="text-white font-bold">{sharer.name}</span>'s screen
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Local Screen Share Mini Indicator */}
+          {isScreenSharing && (
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[101] px-4 py-2 bg-brand-600 text-white rounded-full shadow-2xl flex items-center gap-3 border border-white/20 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Sharing Screen</span>
+              </div>
+              <button 
+                onClick={handleScreenShare}
+                className="px-3 py-1 bg-white/10 hover:bg-white/25 rounded-full text-[9px] font-black uppercase transition-all active:scale-95 border border-white/5"
+              >
+                Stop
+              </button>
+            </div>
+          )}
+
           {/* Render annotation overlays via portals into each page wrapper.
               This ensures they scroll with the PDF pages and are positioned correctly.
               pdfReady forces re-render after zoom so dimensions are correct. */}
@@ -565,6 +669,8 @@ export default function SessionRoom() {
                   cursors={remoteCursors}
                   currentPage={pageNum}
                   currentUserId={user!.id}
+                  width={pageEl.offsetWidth}
+                  height={pageEl.offsetHeight}
                 />
               </div>,
               pageEl
