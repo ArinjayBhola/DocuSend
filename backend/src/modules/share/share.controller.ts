@@ -76,7 +76,7 @@ export class ShareController {
     if (!doc || !doc.isActive) return res.status(404).json({ error: 'Not found' });
 
     // Path resolution needs to be careful from ESM /src/modules/share
-    const filePath = path.resolve(__dirname, '../../../../uploads', doc.filePath);
+    const filePath = path.resolve(__dirname, '../../../uploads', doc.filePath);
     const ext = path.extname(doc.filePath).toLowerCase();
     
     const mimeTypes: Record<string, string> = {
