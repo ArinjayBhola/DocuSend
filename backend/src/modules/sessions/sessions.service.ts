@@ -136,11 +136,16 @@ export class SessionsService {
   }
 
   async leaveSession(id: number, userId: number, userName: string) {
-    await this.repository.updateParticipant(id, { leftAt: new Date().toISOString() });
-    
-    // We don't have the participant ID here, but the repo handles it. 
-    // Wait, the leave route in original code uses sessionId and userId.
-    // I'll adjust the repo to use sessionId/userId for leave.
+    const participant = await this.repository.findParticipant(id, userId);
+    if (!participant) throw new NotFoundError('Not a participant in this session');
+
+    await this.repository.updateParticipant(participant.id, { leftAt: new Date().toISOString() });
+
+    sessionManager.broadcast(id, {
+      type: 'participant_left',
+      userId,
+      name: userName,
+    });
   }
 
   async createAnnotation(sessionId: number, userId: number, userName: string, input: CreateAnnotationInput) {

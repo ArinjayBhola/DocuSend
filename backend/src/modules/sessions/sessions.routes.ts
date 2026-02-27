@@ -11,7 +11,7 @@ router.use(requireAuth);
 router.use(loadUser);
 
 router.get('/', asyncHandler(controller.list));
-router.post('/', checkSessionLimit, asyncHandler(controller.create));
+router.post('/', asyncHandler(checkSessionLimit), asyncHandler(controller.create));
 router.post('/join', asyncHandler(controller.join));
 
 router.get('/:id', asyncHandler(controller.getOne));
@@ -21,6 +21,9 @@ router.post('/:id/leave', asyncHandler(controller.leave));
 router.get('/:id/stream', controller.stream); // SSE shouldn't use asyncHandler if it manages res directly
 router.post('/:id/presence', asyncHandler(controller.updatePresence));
 router.post('/:id/hand-raise', asyncHandler(controller.raiseHand));
+router.post('/:id/screen-share', asyncHandler(controller.screenShare));
+router.post('/:id/typing', asyncHandler(controller.typing));
+router.post('/:id/signal', asyncHandler(controller.signal));
 
 router.get('/:id/annotations', asyncHandler(controller.getAnnotations));
 router.post('/:id/annotations', asyncHandler(controller.addAnnotation));

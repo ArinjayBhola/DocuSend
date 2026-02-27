@@ -9,7 +9,7 @@ const controller = new EngagementController();
 
 router.use(requireAuth);
 router.use(loadUser);
-router.use(checkEngagementAccess);
+router.use(asyncHandler(checkEngagementAccess));
 
 router.get('/scores', asyncHandler(controller.getScores));
 router.get('/scores/:documentId', asyncHandler(controller.getDocumentScores));

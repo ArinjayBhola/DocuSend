@@ -207,4 +207,53 @@ export class SessionsController {
     });
     res.json({ ok: true, raised });
   };
+
+  screenShare = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string);
+    const sharing = sessionManager.toggleScreenShare(id, req.userId!);
+    sessionManager.broadcast(id, {
+      type: 'screen_share',
+      userId: req.userId!,
+      name: req.user!.name,
+      sharing,
+    });
+    res.json({ ok: true, sharing });
+  };
+
+  typing = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string);
+    const { isTyping } = req.body;
+    sessionManager.setTyping(id, req.userId!, !!isTyping);
+    sessionManager.broadcast(id, {
+      type: isTyping ? 'typing_start' : 'typing_stop',
+      userId: req.userId!,
+      name: req.user!.name,
+    }, req.userId!);
+    res.json({ ok: true });
+  };
+
+  signal = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string);
+    const { targetUserId, type, payload } = req.body;
+
+    // Send signal to the target user via SSE
+    const room = sessionManager.getOrCreateRoom(id);
+    const targetParticipant = room.participants.get(targetUserId);
+    if (targetParticipant) {
+      const signalData = JSON.stringify({
+        type: 'signal',
+        fromUserId: req.userId!,
+        signalType: type,
+        payload,
+      });
+      for (const sseRes of targetParticipant.sseRes) {
+        try {
+          sseRes.write(`data: ${signalData}\n\n`);
+        } catch {
+          // Dead connection
+        }
+      }
+    }
+    res.json({ ok: true });
+  };
 }

@@ -38,7 +38,7 @@ const upload = multer({
 router.use(requireAuth);
 router.use(loadUser);
 
-router.post('/upload', checkDocumentLimit, upload.single('document'), asyncHandler(controller.upload));
+router.post('/upload', asyncHandler(checkDocumentLimit), upload.single('document'), asyncHandler(controller.upload));
 router.get('/:id', asyncHandler(controller.getOne));
 router.put('/:id', asyncHandler(controller.update));
 router.delete('/:id', asyncHandler(controller.delete));

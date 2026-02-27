@@ -9,7 +9,7 @@ const controller = new SmartLinksController();
 
 router.use(requireAuth);
 router.use(loadUser);
-router.use(checkSmartLinksAccess);
+router.use(asyncHandler(checkSmartLinksAccess));
 
 router.post('/', asyncHandler(controller.create));
 router.get('/', asyncHandler(controller.list));

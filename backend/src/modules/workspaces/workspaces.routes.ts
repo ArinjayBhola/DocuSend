@@ -15,7 +15,7 @@ router.use(requireAuth);
 router.use(loadUser);
 
 router.get('/', asyncHandler(controller.list));
-router.post('/', checkWorkspaceLimit, asyncHandler(controller.create));
+router.post('/', asyncHandler(checkWorkspaceLimit), asyncHandler(controller.create));
 router.get('/:id', asyncHandler(controller.getOne));
 router.delete('/:id', asyncHandler(controller.delete));
 

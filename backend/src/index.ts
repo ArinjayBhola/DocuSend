@@ -45,13 +45,26 @@ app.use(helmet({
   crossOriginResourcePolicy: false, // Allow local file serving if needed
 }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting — auth endpoints get stricter limits, general API gets generous limits
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'development' ? 10000 : 200,
+  max: 50,
   message: { error: 'Too many requests, please try again later.' },
+  validate: { xForwardedForHeader: false },
 });
-app.use(limiter);
+const generalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 300,
+  message: { error: 'Too many requests, please try again later.' },
+  validate: { xForwardedForHeader: false },
+  skip: (req) => {
+    // Skip rate limiting for SSE streams, presence updates, and signaling
+    if (req.path.endsWith('/stream')) return true;
+    if (req.path.endsWith('/presence')) return true;
+    if (req.path.endsWith('/signal')) return true;
+    return false;
+  },
+});
 
 // Body parsing
 app.use(express.json());
@@ -60,6 +73,10 @@ app.use(cookieParser(env.COOKIE_SECRET));
 
 // Static files (for uploaded PDFs)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Apply rate limiters
+app.use('/api/auth', authLimiter);
+app.use('/api', generalLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

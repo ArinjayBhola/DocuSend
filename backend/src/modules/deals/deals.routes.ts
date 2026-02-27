@@ -11,7 +11,7 @@ router.use(requireAuth);
 router.use(loadUser);
 
 router.get('/', asyncHandler(controller.list));
-router.post('/', checkDealLimit, asyncHandler(controller.create));
+router.post('/', asyncHandler(checkDealLimit), asyncHandler(controller.create));
 router.get('/:id', asyncHandler(controller.getOne));
 router.put('/:id', asyncHandler(controller.update));
 router.delete('/:id', asyncHandler(controller.delete));
