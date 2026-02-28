@@ -1,12 +1,48 @@
-export default function Input({ label, error, className = '', ...props }: any) {
-  return (
-    <div className={className}>
-      {label && <label className="block text-sm font-semibold text-neutral-800 mb-1.5">{label}</label>}
-      <input
-        className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-200 shadow-sm"
-        {...props}
-      />
-      {error && <p className="mt-1.5 text-sm font-medium text-red-600">{error}</p>}
-    </div>
-  )
+import { InputHTMLAttributes, forwardRef } from 'react';
+
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+  helperText?: string;
 }
+
+const Input = forwardRef<HTMLInputElement, InputProps>(({
+  label,
+  error,
+  helperText,
+  className = '',
+  ...props
+}, ref) => {
+  return (
+    <div className="w-full space-y-1.5">
+      {label && (
+        <label className="text-sm font-semibold text-neutral-700 ml-1">
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        <input
+          ref={ref}
+          className={`
+            w-full px-4 py-2.5 bg-white border rounded-xl text-sm transition-all duration-200
+            placeholder:text-neutral-400 outline-none
+            ${error 
+              ? 'border-red-500 focus:ring-4 focus:ring-red-100' 
+              : 'border-neutral-200 focus:border-brand-500 focus:ring-4 focus:ring-brand-100'}
+            ${className}
+          `}
+          {...props}
+        />
+      </div>
+      {(error || helperText) && (
+        <p className={`text-xs ml-1 ${error ? 'text-red-500 font-medium' : 'text-neutral-400'}`}>
+          {error || helperText}
+        </p>
+      )}
+    </div>
+  );
+});
+
+Input.displayName = 'Input';
+
+export default Input;

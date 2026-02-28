@@ -23,7 +23,7 @@ export const updateSmartLinkSchema = z.object({
 
 export const listSmartLinksQuerySchema = z.object({
   documentId: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(50),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 

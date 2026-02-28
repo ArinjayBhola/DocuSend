@@ -62,7 +62,13 @@ export class SmartLinksRepository {
       .orderBy(desc(smartLinks.createdAt))
       .all();
 
-    return links as SmartLinkWithAnalytics[];
+    return links.map(l => ({
+      ...l,
+      totalDuration: Number(l.totalDuration),
+      totalPagesViewed: Number(l.totalPagesViewed),
+      totalPages: Number(l.totalPages),
+      uniqueVisits: Number(l.uniqueVisits)
+    })) as SmartLinkWithAnalytics[];
   }
 
   async update(id: number, data: Partial<NewSmartLink>): Promise<void> {
@@ -88,8 +94,8 @@ export class SmartLinksRepository {
       .select({ count: sql<number>`count(*)` })
       .from(smartLinks)
       .where(eq(smartLinks.userId, userId))
-      .get() as { count: number };
-    return Number(result.count);
+      .all();
+    return Number(result[0]?.count || 0);
   }
 
   async getViewsForLink(linkId: number): Promise<SmartLinkViewDetail[]> {

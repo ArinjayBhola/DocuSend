@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
+import { Bell, Mail, Target, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { getPreferences, updatePreferences } from '../api/notifications'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
+import SectionHeader from '../components/ui/SectionHeader'
+import Card from '../components/ui/Card'
+import Badge from '../components/ui/Badge'
 
 export default function NotificationSettings() {
   const [prefs, setPrefs] = useState<any>(null)
@@ -17,7 +21,8 @@ export default function NotificationSettings() {
 
   const handleToggle = async (key: string) => {
     const newVal = !prefs[key]
-    setPrefs({ ...prefs, [key]: newVal })
+    const oldPrefs = { ...prefs }
+    setPrefs({ ...oldPrefs, [key]: newVal })
     setSaving(true)
     setSaved(false)
     try {
@@ -26,71 +31,110 @@ export default function NotificationSettings() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
-      setPrefs({ ...prefs, [key]: !newVal }) // revert
+      setPrefs(oldPrefs) // revert
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <LoadingSpinner />
+  if (loading) return (
+    <div className="flex items-center justify-center h-[50vh]">
+      <LoadingSpinner />
+    </div>
+  )
 
   const toggleItems = [
     {
       key: 'inAppNotifications',
       label: 'In-app notifications',
       description: 'Show notifications in the bell icon when someone views your documents.',
+      icon: Bell,
+      color: 'text-brand-600',
+      bgColor: 'bg-brand-50'
     },
     {
       key: 'emailOnView',
       label: 'Email on document view',
       description: 'Receive an email every time someone starts viewing one of your documents.',
+      icon: Mail,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50'
     },
     {
       key: 'emailOnEmailCapture',
       label: 'Email on lead capture',
       description: 'Receive an email when a viewer submits their email address to access your document.',
+      icon: Target,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50'
     },
   ]
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 sm:px-6 lg:px-8 pt-24 pb-10">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Notification Settings</h1>
-          <p className="text-sm font-medium text-neutral-500 mt-1">
-            Control how and when you get notified about document activity.
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto space-y-10">
+      <SectionHeader 
+        title="Notification Settings" 
+        description="Control how and when you get notified about document activity and recipient engagement."
+      />
 
-        <div className="bg-white rounded-xl border border-neutral-100 shadow-sm divide-y divide-neutral-100">
-          {toggleItems.map((item) => (
-            <div key={item.key} className="flex items-center justify-between px-6 py-5">
-              <div className="pr-4">
-                <p className="text-sm font-semibold text-neutral-900">{item.label}</p>
-                <p className="text-xs font-medium text-neutral-500 mt-0.5">{item.description}</p>
+      <div className="grid grid-cols-1 gap-8">
+        <Card padding="none" className="overflow-hidden">
+          <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-neutral-50 rounded-lg text-neutral-500 border border-neutral-100">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-              <button
-                onClick={() => handleToggle(item.key)}
-                disabled={saving}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
-                  prefs[item.key] ? 'bg-brand-600' : 'bg-neutral-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                    prefs[item.key] ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <h3 className="text-lg font-bold text-neutral-900 tracking-tight">Preferences</h3>
             </div>
-          ))}
-        </div>
-
-        {saved && (
-          <div className="mt-4 text-center">
-            <span className="text-sm font-semibold text-emerald-600">Settings saved</span>
+            {saved && (
+              <Badge variant="success" size="sm" className="animate-in fade-in slide-in-from-right-4 duration-300">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> All changes saved
+              </Badge>
+            )}
           </div>
-        )}
+
+          <div className="divide-y divide-neutral-100">
+            {toggleItems.map((item) => (
+              <div key={item.key} className="flex items-center justify-between px-8 py-6 group hover:bg-neutral-50/50 transition-colors">
+                <div className="flex items-start gap-4 pr-6">
+                  <div className={`mt-0.5 p-2 rounded-xl border border-transparent group-hover:border-neutral-200 group-hover:bg-white transition-all ${item.bgColor} ${item.color}`}>
+                    <item.icon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-bold text-neutral-900 leading-tight mb-1">{item.label}</p>
+                    <p className="text-[13px] font-medium text-neutral-500 leading-relaxed max-w-lg">{item.description}</p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => handleToggle(item.key)}
+                  disabled={saving}
+                  className={`relative inline-flex h-6.5 w-12 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-brand-500/10 ${
+                    prefs[item.key] ? 'bg-brand-600 shadow-sm shadow-brand-600/30' : 'bg-neutral-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
+                      prefs[item.key] ? 'translate-x-6.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card padding="md" className="bg-neutral-50/50 border-dashed border-neutral-200">
+          <div className="flex items-center gap-4 text-neutral-500">
+            <div className="p-2 bg-white rounded-lg border border-neutral-100">
+              <Bell className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-medium leading-relaxed">
+              We'll soon be adding support for Slack and MS Teams notifications. 
+              <span className="text-brand-600 font-bold ml-1 cursor-pointer hover:underline">Vote for integrations &rarr;</span>
+            </p>
+          </div>
+        </Card>
       </div>
     </div>
   )

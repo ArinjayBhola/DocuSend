@@ -20,8 +20,11 @@ export class SmartLinksController {
   };
 
   list = async (req: Request, res: Response) => {
+    console.log('SmartLinksController.list called for user:', req.userId);
     const query = listSmartLinksQuerySchema.parse(req.query);
+    console.log('Parsed query:', query);
     const links = await this.service.list(req.userId!, query.documentId);
+    console.log('Total links found:', links.length);
     const paginated = links.slice(query.offset, query.offset + query.limit);
     res.json({ links: paginated, total: links.length });
   };

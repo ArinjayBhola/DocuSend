@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import Layout from './components/layout/Layout'
+import AppLayout from './components/layout/AppLayout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -25,7 +25,6 @@ import SessionRoom from './pages/SessionRoom'
 import ShareViewer from './pages/ShareViewer'
 import ShareWorkspace from './pages/ShareWorkspace'
 import Engagement from './pages/Engagement'
-import SmartLinks from './pages/SmartLinks'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -42,36 +41,34 @@ export default function App() {
             <Route path="/sessions/:id" element={<SessionRoom />} />
           </Route>
 
-          {/* Routes with layout */}
-          <Route element={<Layout />}>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/documents/upload" element={<Upload />} />
-              <Route path="/documents/:id/settings" element={<DocumentSettings />} />
-              <Route path="/documents/:id/analytics" element={<Analytics />} />
-              <Route path="/workspaces" element={<Workspaces />} />
-              <Route path="/workspaces/new" element={<WorkspaceNew />} />
-              <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
-              <Route path="/billing" element={<Billing />} />
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/deals" element={<Deals />} />
-              <Route path="/deals/new" element={<DealNew />} />
-              <Route path="/deals/:id" element={<DealDetail />} />
-              <Route path="/sessions" element={<Sessions />} />
-              <Route path="/sessions/new" element={<SessionNew />} />
-              <Route path="/engagement" element={<Engagement />} />
-              <Route path="/smartlinks" element={<SmartLinks />} />
-              <Route path="/live" element={<LiveDashboard />} />
-              <Route path="/notifications/settings" element={<NotificationSettings />} />
-            </Route>
-
-            <Route path="*" element={<NotFound />} />
+          {/* Routes with AppLayout (New Design) */}
+          <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/documents/upload" element={<Upload />} />
+                <Route path="/documents/:id/settings" element={<DocumentSettings />} />
+                <Route path="/documents/:id/analytics" element={<Analytics />} />
+                <Route path="/workspaces" element={<Workspaces />} />
+                <Route path="/workspaces/new" element={<WorkspaceNew />} />
+                <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
+                <Route path="/billing" element={<Billing />} />
+                <Route path="/leads" element={<Leads />} />
+                <Route path="/deals" element={<Deals />} />
+                <Route path="/deals/new" element={<DealNew />} />
+                <Route path="/deals/:id" element={<DealDetail />} />
+                <Route path="/sessions" element={<Sessions />} />
+                <Route path="/sessions/new" element={<SessionNew />} />
+                <Route path="/engagement" element={<Engagement />} />
+                <Route path="/live" element={<LiveDashboard />} />
+                <Route path="/notifications/settings" element={<NotificationSettings />} />
+              </Route>
           </Route>
+
+          {/* Auth & Public Pages - keep simple for now or redesign later */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

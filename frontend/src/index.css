@@ -1,31 +1,49 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #fef6f5;
-  --color-brand-100: #fdece8;
-  --color-brand-200: #fcd5cc;
-  --color-brand-300: #f8b5a5;
-  --color-brand-400: #f38a71;
-  --color-brand-500: #eb6445;
-  --color-brand-600: #d64728;
-  --color-brand-700: #b3361c;
-  --color-brand-800: #942f1a;
-  --color-brand-900: #7a2b19;
-  --color-brand-950: #42130a;
+  --color-brand-50: var(--color-indigo-50);
+  --color-brand-100: var(--color-indigo-100);
+  --color-brand-200: var(--color-indigo-200);
+  --color-brand-300: var(--color-indigo-300);
+  --color-brand-400: var(--color-indigo-400);
+  --color-brand-500: var(--color-indigo-600);
+  /* Slightly deeper brand primary */
+  --color-brand-600: var(--color-indigo-700);
+  --color-brand-700: var(--color-indigo-800);
+  --color-brand-800: var(--color-indigo-900);
+  --color-brand-900: var(--color-indigo-950);
 
-  --color-neutral-50: #faf9f6;
-  --color-neutral-100: #f5f2ec;
-  --color-neutral-200: #e8e2d9;
-  --color-neutral-300: #d5cbc0;
-  --color-neutral-400: #bfaea0;
-  --color-neutral-500: #a79585;
-  --color-neutral-600: #8c7a6a;
-  --color-neutral-700: #716255;
-  --color-neutral-800: #5c5046;
-  --color-neutral-900: #4a413a;
-  --color-neutral-950: #27211d;
+  --color-neutral-50: var(--color-slate-50);
+  --color-neutral-100: var(--color-slate-100);
+  --color-neutral-200: var(--color-slate-200);
+  --color-neutral-300: var(--color-slate-300);
+  --color-neutral-400: var(--color-slate-400);
+  --color-neutral-500: var(--color-slate-500);
+  --color-neutral-600: var(--color-slate-600);
+  --color-neutral-700: var(--color-slate-700);
+  --color-neutral-800: var(--color-slate-800);
+  --color-neutral-900: var(--color-slate-900);
+  --color-neutral-950: var(--color-slate-950);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-neutral-50 text-neutral-900 font-sans antialiased selection:bg-brand-100/50;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight text-neutral-900;
+  }
 }
 
 @layer base {

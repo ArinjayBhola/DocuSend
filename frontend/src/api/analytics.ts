@@ -1,3 +1,3 @@
 import { get } from './client';
 
-export const getAnalytics = (docId) => get(`/documents/${docId}/analytics`);
+export const getAnalytics = (docId) => get(`/analytics/${docId}/analytics`);

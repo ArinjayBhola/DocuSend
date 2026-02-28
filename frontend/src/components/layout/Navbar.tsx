@@ -1,59 +1,91 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import NotificationBell from '../notifications/NotificationBell'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   const handleLogout = async () => {
     await logout()
     navigate('/')
   }
 
-  return (
-    <nav className="fixed top-0 inset-x-0 z-50 bg-white/70 backdrop-blur-md border-b border-neutral-200/50 shadow-sm transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-20 items-center">
-          <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 transition-transform duration-300 group-hover:-translate-y-0.5 shadow-md shadow-brand-600/20 flex items-center justify-center">
-              <span className="text-white font-bold leading-none select-none">D</span>
-            </div>
-            <span className="text-xl font-bold tracking-tight text-neutral-900">
-              DocuSend
-            </span>
-          </Link>
+  const navItems = [
+    { name: 'Dashboard', href: '/dashboard' },
+    { name: 'Smart Links', href: '/smartlinks' },
+    { name: 'Workspaces', href: '/workspaces' },
+    { name: 'Leads', href: '/leads' },
+    { name: 'Engagement', href: '/engagement' },
+    { name: 'Deals', href: '/deals' },
+    { name: 'Sessions', href: '/sessions' },
+  ]
 
-          <div className="flex items-center gap-6">
+  const isActive = (path: string) => pathname === path
+
+  return (
+    <nav className="fixed top-0 inset-x-0 z-50 bg-white border-b border-slate-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16 items-center">
+          <div className="flex items-center gap-8">
+            <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-md bg-indigo-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">D</span>
+              </div>
+              <span className="text-lg font-bold tracking-tight text-slate-900">
+                DocuSend
+              </span>
+            </Link>
+
+            {user && (
+              <div className="hidden md:flex items-center gap-1">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive(item.href)
+                        ? 'text-indigo-600 bg-indigo-50'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4">
             {user ? (
               <>
-                <Link to="/dashboard" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Dashboard</Link>
-                <Link to="/live" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors inline-flex items-center gap-1.5">
+                <Link 
+                  to="/live" 
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                    isActive('/live') 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
                   Live
                 </Link>
-                <Link to="/workspaces" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Workspaces</Link>
-                <Link to="/leads" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Leads</Link>
-                <Link to="/engagement" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Engagement</Link>
-                <Link to="/smartlinks" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Smart Links</Link>
-                <Link to="/deals" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Deals</Link>
-                <Link to="/sessions" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Sessions</Link>
-                <Link to="/billing" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Billing</Link>
-
-                <div className="h-6 w-px bg-neutral-200 mx-2"></div>
-
+                
                 <NotificationBell />
                 
+                <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center shadow-sm">
-                    <span className="text-xs font-bold text-neutral-600">{user.name.charAt(0).toUpperCase()}</span>
+                  <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
+                    <span className="text-xs font-semibold text-slate-600">{user.name.charAt(0).toUpperCase()}</span>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+                    className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
                   >
                     Logout
                   </button>
@@ -61,8 +93,8 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link to="/login" className="text-sm font-medium text-neutral-600 hover:text-brand-700 transition-colors">Log in</Link>
-                <Link to="/register" className="text-sm font-medium bg-brand-600 text-white px-5 py-2.5 rounded-lg shadow-md shadow-brand-600/20 hover:bg-brand-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200">
+                <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-indigo-600">Log in</Link>
+                <Link to="/register" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
                   Get Started
                 </Link>
               </>
